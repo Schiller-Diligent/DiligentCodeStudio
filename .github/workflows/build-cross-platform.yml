@@ -11,19 +11,28 @@ permissions:
 
 jobs:
   build:
-    name: Build ${{ matrix.platform.name }}
-    runs-on: ${{ matrix.platform.os }}
+    name: Build ${{ matrix.name }}
+    runs-on: ${{ matrix.os }}
 
     strategy:
       fail-fast: false
       matrix:
-        platform:
+        include:
           - name: Windows
             os: windows-2022
           - name: Linux
             os: ubuntu-22.04
           - name: macOS
             os: macos-14
+
+    env:
+      CI: true
+      CARGO_INCREMENTAL: 0
+      CARGO_TERM_COLOR: always
+      NPM_CONFIG_AUDIT: false
+      NPM_CONFIG_FUND: false
+      NPM_CONFIG_UPDATE_NOTIFIER: false
+      NPM_CONFIG_CACHE: ${{ runner.temp }}/npm-cache
 
     steps:
       - name: Checkout repository
@@ -34,17 +43,28 @@ jobs:
         with:
           node-version: 20
 
-      - name: Show tool versions
+      - name: Show Node and npm versions
         shell: bash
         run: |
+          echo "Node version:"
           node --version
+          echo "npm version:"
           npm --version
+          echo "npm cache:"
+          npm config get cache
 
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
 
+      - name: Show Rust versions
+        shell: bash
+        run: |
+          rustc --version
+          cargo --version
+
       - name: Install Linux Tauri dependencies
         if: runner.os == 'Linux'
+        shell: bash
         run: |
           sudo apt-get update
           sudo apt-get install -y \
@@ -58,24 +78,103 @@ jobs:
             libayatana-appindicator3-dev \
             librsvg2-dev
 
-      - name: Clean npm cache
-        run: npm cache clean --force
+      - name: Clean dependency folders
+        shell: bash
+        run: |
+          echo "Cleaning old dependency/build folders..."
+          rm -rf node_modules
+          rm -rf dist
+          rm -rf src-tauri/target/debug
+          rm -rf src-tauri/target/release/bundle
+          npm cache clean --force || true
 
-      - name: Install frontend dependencies
-        run: npm ci --no-audit --no-fund --prefer-online
-        env:
-          NPM_CONFIG_CACHE: ${{ runner.temp }}/npm-cache
+      - name: Install frontend dependencies with retry
+        shell: bash
+        run: |
+          set +e
+
+          echo "First attempt: npm ci"
+          npm ci --no-audit --no-fund --prefer-online
+          FIRST_EXIT=$?
+
+          if [ $FIRST_EXIT -ne 0 ]; then
+            echo "npm ci failed with exit code $FIRST_EXIT"
+            echo "Cleaning node_modules and retrying npm ci..."
+            rm -rf node_modules
+            npm cache clean --force || true
+            npm ci --no-audit --no-fund --prefer-online
+            SECOND_EXIT=$?
+          else
+            SECOND_EXIT=0
+          fi
+
+          if [ $SECOND_EXIT -ne 0 ]; then
+            echo "npm ci retry failed with exit code $SECOND_EXIT"
+            echo "Trying npm install as final fallback..."
+            rm -rf node_modules
+            npm install --no-audit --no-fund --prefer-online
+            THIRD_EXIT=$?
+          else
+            THIRD_EXIT=0
+          fi
+
+          if [ $THIRD_EXIT -ne 0 ]; then
+            echo "Dependency installation failed after all attempts."
+            exit 1
+          fi
+
+          echo "Dependency installation step completed."
+
+      - name: Verify frontend dependencies
+        shell: bash
+        run: |
+          echo "Verifying node_modules..."
+          if [ ! -d "node_modules" ]; then
+            echo "ERROR: node_modules folder is missing."
+            exit 1
+          fi
+
+          echo "Checking for TypeScript compiler..."
+          if [ ! -f "node_modules/.bin/tsc" ] && [ ! -f "node_modules/.bin/tsc.cmd" ]; then
+            echo "ERROR: TypeScript compiler was not found."
+            echo "Listing node_modules/.bin for diagnostics:"
+            ls -la node_modules/.bin || true
+            exit 1
+          fi
+
+          echo "Checking for Vite..."
+          if [ ! -f "node_modules/.bin/vite" ] && [ ! -f "node_modules/.bin/vite.cmd" ]; then
+            echo "ERROR: Vite was not found."
+            echo "Listing node_modules/.bin for diagnostics:"
+            ls -la node_modules/.bin || true
+            exit 1
+          fi
+
+          echo "Frontend dependencies verified."
 
       - name: Build frontend
-        run: npm run build
+        shell: bash
+        run: |
+          echo "Building frontend..."
+          npm run build
 
       - name: Build Tauri app
-        run: npm run tauri:build
+        shell: bash
+        run: |
+          echo "Building Tauri app for ${{ matrix.name }}..."
+          npm run tauri:build
+
+      - name: List bundle output
+        if: always()
+        shell: bash
+        run: |
+          echo "Bundle output:"
+          find src-tauri/target/release/bundle -maxdepth 5 -type f -print || true
 
       - name: Upload build artifacts
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
-          name: diligent-code-studio-${{ matrix.platform.name }}
+          name: diligent-code-studio-${{ matrix.name }}
           path: |
             src-tauri/target/release/bundle/**
           if-no-files-found: error
