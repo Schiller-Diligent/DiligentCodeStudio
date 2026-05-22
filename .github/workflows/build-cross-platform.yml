@@ -40,7 +40,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v6
         with:
-          node-version: 20
+          node-version: 20.12.2
 
       - name: Show Node and npm versions
         shell: bash
@@ -49,6 +49,8 @@ jobs:
           node --version
           echo "npm version:"
           npm --version
+          echo "Runner OS:"
+          echo "${{ runner.os }}"
           echo "Runner temp:"
           echo "$RUNNER_TEMP"
 
@@ -56,9 +58,11 @@ jobs:
         shell: bash
         run: |
           npm config set cache "$RUNNER_TEMP/npm-cache" --global
-          npm config set fetch-timeout 120000 --global
-          npm config set fetch-retry-maxtimeout 120000 --global
-          npm config set fetch-retry-mintimeout 20000 --global
+          npm config set fetch-timeout 300000 --global
+          npm config set fetch-retry-maxtimeout 300000 --global
+          npm config set fetch-retry-mintimeout 30000 --global
+          npm config set fetch-retry-factor 10 --global
+          npm config set fetch-retries 5 --global
           npm config set audit false --global
           npm config set fund false --global
           npm config get cache
@@ -88,7 +92,7 @@ jobs:
             libayatana-appindicator3-dev \
             librsvg2-dev
 
-      - name: Clean dependency folders
+      - name: Clean dependency and build folders
         shell: bash
         run: |
           echo "Cleaning old dependency/build folders..."
@@ -100,24 +104,25 @@ jobs:
 
       - name: Install frontend dependencies with retry
         shell: bash
+        timeout-minutes: 12
         run: |
           set +e
 
           echo "Clearing npm cache before install..."
           npm cache clean --force || true
 
-          echo "First attempt: npm ci"
-          npm ci --no-audit --no-fund --prefer-online --timeout=120000 --fetch-timeout=120000
+          echo "First attempt: npm install"
+          npm install --no-audit --no-fund --prefer-online --timeout=300000 --fetch-timeout=300000
           FIRST_EXIT=$?
 
           if [ $FIRST_EXIT -ne 0 ]; then
-            echo "npm ci failed with exit code $FIRST_EXIT"
+            echo "npm install failed with exit code $FIRST_EXIT"
             echo "Cleaning node_modules and npm cache..."
             rm -rf node_modules
             npm cache clean --force || true
 
-            echo "Second attempt: npm install"
-            npm install --no-audit --no-fund --prefer-online --timeout=120000 --fetch-timeout=120000
+            echo "Second attempt: npm install with --legacy-peer-deps"
+            npm install --no-audit --no-fund --prefer-online --timeout=300000 --fetch-timeout=300000 --legacy-peer-deps
             SECOND_EXIT=$?
           else
             SECOND_EXIT=0
