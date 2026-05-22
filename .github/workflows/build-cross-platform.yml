@@ -3,35 +3,48 @@ name: Build Diligent Code Studio Cross-Platform
 on:
   workflow_dispatch:
   push:
-    branches: [ main ]
-    tags: [ 'v*' ]
-  pull_request:
-    branches: [ main ]
+    tags:
+      - "v*"
+
+permissions:
+  contents: read
 
 jobs:
   build:
-    name: Build ${{ matrix.name }}
+    name: Build ${{ matrix.platform.name }}
+    runs-on: ${{ matrix.platform.os }}
+
     strategy:
       fail-fast: false
       matrix:
-        include:
+        platform:
           - name: Windows
-            platform: windows-latest
-            artifact_name: diligent-code-studio-windows
-          - name: macOS
-            platform: macos-latest
-            artifact_name: diligent-code-studio-macos
+            os: windows-2022
           - name: Linux
-            platform: ubuntu-22.04
-            artifact_name: diligent-code-studio-linux
-    runs-on: ${{ matrix.platform }}
+            os: ubuntu-22.04
+          - name: macOS
+            os: macos-14
 
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - name: Checkout repository
+        uses: actions/checkout@v5
 
-      - name: Install Linux dependencies
-        if: matrix.platform == 'ubuntu-22.04'
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: 20
+
+      - name: Show tool versions
+        shell: bash
+        run: |
+          node --version
+          npm --version
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Install Linux Tauri dependencies
+        if: runner.os == 'Linux'
         run: |
           sudo apt-get update
           sudo apt-get install -y \
@@ -45,43 +58,24 @@ jobs:
             libayatana-appindicator3-dev \
             librsvg2-dev
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          cache: npm
-
-      - name: Setup Rust
-        uses: dtolnay/rust-toolchain@stable
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          cache: npm
+      - name: Clean npm cache
+        run: npm cache clean --force
 
       - name: Install frontend dependencies
-        run: npm ci
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          cache: npm
-
-      - name: Install frontend dependencies
-        run: npm ci
-
-      - name: Tauri build
-        uses: tauri-apps/tauri-action@v0
+        run: npm ci --no-audit --no-fund --prefer-online
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          NPM_CONFIG_CACHE: ${{ runner.temp }}/npm-cache
 
-      - name: Upload platform bundle artifacts
-        uses: actions/upload-artifact@v4
+      - name: Build frontend
+        run: npm run build
+
+      - name: Build Tauri app
+        run: npm run tauri:build
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v6
         with:
-          name: ${{ matrix.artifact_name }}
+          name: diligent-code-studio-${{ matrix.platform.name }}
           path: |
             src-tauri/target/release/bundle/**
-          if-no-files-found: warn
-          retention-days: 14
+          if-no-files-found: error
