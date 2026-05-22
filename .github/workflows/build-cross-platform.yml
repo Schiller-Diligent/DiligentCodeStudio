@@ -32,7 +32,6 @@ jobs:
       NPM_CONFIG_AUDIT: false
       NPM_CONFIG_FUND: false
       NPM_CONFIG_UPDATE_NOTIFIER: false
-      NPM_CONFIG_CACHE: ${{ runner.temp }}/npm-cache
 
     steps:
       - name: Checkout repository
@@ -50,8 +49,8 @@ jobs:
           node --version
           echo "npm version:"
           npm --version
-          echo "npm cache:"
-          npm config get cache
+          echo "RUNNER_TEMP:"
+          echo "$RUNNER_TEMP"
 
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
@@ -90,6 +89,8 @@ jobs:
 
       - name: Install frontend dependencies with retry
         shell: bash
+        env:
+          NPM_CONFIG_CACHE: $RUNNER_TEMP/npm-cache
         run: |
           set +e
 
