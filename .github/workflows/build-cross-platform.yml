@@ -57,8 +57,14 @@ jobs:
       - name: Install npm dependencies
         run: npm install
 
-      - name: TypeScript build
-        run: npm run build
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install frontend dependencies
+        run: npm ci
 
       - name: Tauri build
         uses: tauri-apps/tauri-action@v0
