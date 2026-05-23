@@ -144,9 +144,60 @@ type AppPreferences = {
   rememberExpandedFolders: boolean;
   terminalShell: TerminalShellPreference;
   compactMode: boolean;
+  menuPageOrder: WorkspacePage[];
 };
 
 const PREFERENCES_STORAGE_KEY = 'diligent-code-studio.preferences.v1';
+
+const DEFAULT_PAGE_ORDER: WorkspacePage[] = [
+  'templates',
+  'editor',
+  'findsearch',
+  'terminal',
+  'git',
+  'problems',
+  'release',
+  'registry',
+  'project',
+  'logs',
+  'settings',
+];
+
+function workspacePageLabel(page: WorkspacePage): string {
+  switch (page) {
+    case 'editor': return 'Editor';
+    case 'findsearch': return 'Find/Search';
+    case 'terminal': return 'Terminal';
+    case 'git': return 'Git';
+    case 'problems': return 'Problems';
+    case 'release': return 'Release';
+    case 'templates': return 'Templates';
+    case 'registry': return 'Registry';
+    case 'project': return 'Tools';
+    case 'logs': return 'Logs';
+    case 'settings': return 'Settings';
+    default: return String(page);
+  }
+}
+
+function normalizePageOrder(value: unknown): WorkspacePage[] {
+  const requested = Array.isArray(value) ? value : [];
+  const ordered: WorkspacePage[] = [];
+
+  for (const item of requested) {
+    if (isWorkspacePage(item) && !ordered.includes(item)) {
+      ordered.push(item);
+    }
+  }
+
+  for (const page of DEFAULT_PAGE_ORDER) {
+    if (!ordered.includes(page)) {
+      ordered.push(page);
+    }
+  }
+
+  return ordered;
+}
 
 const DEFAULT_PREFERENCES: AppPreferences = {
   theme: 'dark',
@@ -163,6 +214,7 @@ const DEFAULT_PREFERENCES: AppPreferences = {
   rememberExpandedFolders: true,
   terminalShell: 'auto',
   compactMode: false,
+  menuPageOrder: DEFAULT_PAGE_ORDER,
 };
 
 function clampNumber(value: unknown, fallback: number, min: number, max: number): number {
@@ -190,12 +242,14 @@ function loadPreferences(): AppPreferences {
     const parsed = JSON.parse(raw) as Partial<AppPreferences>;
     const theme = ['dark', 'midnight', 'light'].includes(String(parsed.theme)) ? parsed.theme as ThemePreference : DEFAULT_PREFERENCES.theme;
     const terminalShell = ['auto', 'powershell', 'pwsh', 'cmd', 'bash', 'zsh'].includes(String(parsed.terminalShell)) ? parsed.terminalShell as TerminalShellPreference : DEFAULT_PREFERENCES.terminalShell;
+    const menuPageOrder = normalizePageOrder(parsed.menuPageOrder);
 
     return {
       ...DEFAULT_PREFERENCES,
       ...parsed,
       theme,
       terminalShell,
+      menuPageOrder,
       editorFontSize: clampNumber(parsed.editorFontSize, DEFAULT_PREFERENCES.editorFontSize, 10, 28),
       autoSaveDelaySeconds: clampNumber(parsed.autoSaveDelaySeconds, DEFAULT_PREFERENCES.autoSaveDelaySeconds, 1, 30),
       lastActivePage: normalizeWorkspacePage(parsed.lastActivePage),
@@ -476,7 +530,7 @@ export default function App() {
   ]);
   const [terminalCommand, setTerminalCommand] = useState('git status');
   const [terminalOutput, setTerminalOutput] = useState(
-    'Diligent Terminal ready. Version 0.3.5 includes cross-platform shell and tool detection.\n',
+    'Diligent Terminal ready. Version 0.3.8 includes configurable workspace menu ordering.\n',
   );
   const [terminalRunning, setTerminalRunning] = useState(false);
   const [terminalCollapsed, setTerminalCollapsed] = useState(false);
@@ -789,6 +843,59 @@ export default function App() {
 
   function updatePreference<K extends keyof AppPreferences>(key: K, value: AppPreferences[K]) {
     setPreferences((current) => ({ ...current, [key]: value }));
+  }
+
+  function activateWorkspacePage(page: WorkspacePage) {
+    setActivePage(page);
+
+    if (page === 'git') {
+      void refreshGitStatus(workspacePath, true);
+    }
+
+    if (page === 'release') {
+      void refreshReleaseInfo();
+    }
+
+    if (page === 'templates') {
+      void refreshTemplates();
+    }
+  }
+
+  function moveMenuPage(page: WorkspacePage, direction: 'left' | 'right') {
+    setPreferences((current) => {
+      const order = normalizePageOrder(current.menuPageOrder);
+      const index = order.indexOf(page);
+      if (index < 0) return current;
+
+      const nextIndex = direction === 'left' ? index - 1 : index + 1;
+      if (nextIndex < 0 || nextIndex >= order.length) return current;
+
+      const next = [...order];
+      [next[index], next[nextIndex]] = [next[nextIndex], next[index]];
+      return { ...current, menuPageOrder: next };
+    });
+  }
+
+  function resetMenuPageOrder() {
+    setPreferences((current) => ({ ...current, menuPageOrder: DEFAULT_PAGE_ORDER }));
+    log('info', 'Workspace menu button order reset to defaults.');
+  }
+
+  function workspacePageIcon(page: WorkspacePage) {
+    switch (page) {
+      case 'editor': return <FileCode2 size={14} />;
+      case 'findsearch': return <Search size={14} />;
+      case 'terminal': return <TerminalSquare size={14} />;
+      case 'git': return <GitBranch size={14} />;
+      case 'problems': return <AlertTriangle size={14} />;
+      case 'release': return <PackageCheck size={14} />;
+      case 'templates': return <LayoutTemplate size={14} />;
+      case 'registry': return <Wrench size={14} />;
+      case 'project': return <PackageCheck size={14} />;
+      case 'logs': return <AlertTriangle size={14} />;
+      case 'settings': return <SlidersHorizontal size={14} />;
+      default: return <FileCode2 size={14} />;
+    }
   }
 
 
@@ -2006,7 +2113,7 @@ ERROR: ${String(error)}
           <div>
             <h1>Diligent Code Studio</h1>
             <p className="brand-tagline">Secure software-building workbench</p>
-            <p>Community Edition v0.3.5</p>
+            <p>Community Edition v0.3.8</p>
           </div>
         </div>
 
@@ -2096,17 +2203,16 @@ ERROR: ${String(error)}
           </div>
           <div className="toolbar">
             <nav className="top-page-nav" aria-label="Workspace pages">
-              <button className={activePage === 'editor' ? 'active' : ''} onClick={() => setActivePage('editor')}><FileCode2 size={14} /> Editor</button>
-              <button className={activePage === 'findsearch' ? 'active' : ''} onClick={() => setActivePage('findsearch')}><Search size={14} /> Find/Search</button>
-              <button className={activePage === 'terminal' ? 'active' : ''} onClick={() => setActivePage('terminal')}><TerminalSquare size={14} /> Terminal</button>
-              <button className={activePage === 'git' ? 'active' : ''} onClick={() => { setActivePage('git'); void refreshGitStatus(workspacePath, true); }}><GitBranch size={14} /> Git</button>
-              <button className={activePage === 'problems' ? 'active' : ''} onClick={() => setActivePage('problems')}><AlertTriangle size={14} /> Problems</button>
-              <button className={activePage === 'release' ? 'active' : ''} onClick={() => { setActivePage('release'); void refreshReleaseInfo(); }}><PackageCheck size={14} /> Release</button>
-              <button className={activePage === 'templates' ? 'active' : ''} onClick={() => { setActivePage('templates'); void refreshTemplates(); }}><LayoutTemplate size={14} /> Templates</button>
-              <button className={activePage === 'registry' ? 'active' : ''} onClick={() => setActivePage('registry')}><Wrench size={14} /> Registry</button>
-              <button className={activePage === 'project' ? 'active' : ''} onClick={() => setActivePage('project')}><PackageCheck size={14} /> Tools</button>
-              <button className={activePage === 'logs' ? 'active' : ''} onClick={() => setActivePage('logs')}><AlertTriangle size={14} /> Logs</button>
-              <button className={activePage === 'settings' ? 'active' : ''} onClick={() => setActivePage('settings')}><SlidersHorizontal size={14} /> Settings</button>
+              {normalizePageOrder(preferences.menuPageOrder).map((page) => (
+                <button
+                  key={page}
+                  className={activePage === page ? 'active' : ''}
+                  onClick={() => activateWorkspacePage(page)}
+                  title={`${workspacePageLabel(page)} page`}
+                >
+                  {workspacePageIcon(page)} {workspacePageLabel(page)}
+                </button>
+              ))}
             </nav>
             {unsavedFileCount > 0 && <span className="unsaved-pill">{unsavedFileCount} unsaved</span>}
             <button className="toolbar-action" onClick={saveActiveFile} disabled={!activeFile} title="Save active file">
@@ -2168,7 +2274,7 @@ ERROR: ${String(error)}
                 <div className="welcome-card editor-welcome-card">
                   <ShieldCheck size={48} />
                   <h2>Open a file to start editing.</h2>
-                  <p>Version 0.3.7 combines Find and Workspace Search under one cleaner Find/Search page.</p>
+                  <p>Version 0.3.8 adds configurable top menu button order with Templates first by default.</p>
                   <div className="recent-files-card">
                     <div className="recent-files-header">
                       <strong>Recent Files</strong>
@@ -2988,6 +3094,24 @@ ERROR: ${String(error)}
                   <input type="checkbox" checked={preferences.compactMode} onChange={(event) => updatePreference('compactMode', event.target.checked)} />
                   Enable compact interface mode
                 </label>
+              </section>
+
+              <section className="panel settings-panel wide-settings-panel">
+                <div className="panel-title"><LayoutTemplate size={16} /> Workspace Menu Order</div>
+                <p className="muted-note">Arrange the top workspace buttons. The first item appears farthest left in the main toolbar.</p>
+                <div className="menu-order-list">
+                  {normalizePageOrder(preferences.menuPageOrder).map((page, index) => (
+                    <div key={page} className="menu-order-row">
+                      <span className="menu-order-position">{index + 1}</span>
+                      <span className="menu-order-label">{workspacePageIcon(page)} {workspacePageLabel(page)}</span>
+                      <button onClick={() => moveMenuPage(page, 'left')} disabled={index === 0}>Move Left</button>
+                      <button onClick={() => moveMenuPage(page, 'right')} disabled={index === normalizePageOrder(preferences.menuPageOrder).length - 1}>Move Right</button>
+                    </div>
+                  ))}
+                </div>
+                <div className="settings-actions">
+                  <button onClick={resetMenuPageOrder}><RefreshCw size={14} /> Reset Menu Order</button>
+                </div>
               </section>
 
               <section className="panel settings-panel">

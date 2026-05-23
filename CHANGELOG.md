@@ -1,5 +1,14 @@
+# Changelog
 
-## v0.3.7
+## v0.3.9
+
+- App window now opens maximized by default while keeping normal window controls available.
+- Added Windows minimized development launcher: `Start-DiligentCodeStudio-Dev-Minimized.cmd`.
+- Added normal Windows development launcher: `Start-DiligentCodeStudio-Dev.cmd`.
+- Added PowerShell launch script with log output under `logs/dev-launch.log`.
+
+
+## v0.3.9
 
 - Combined the separate Find and Search workspace pages into one compact **Find/Search** page.
 - Added mode tabs for **Current File** and **Workspace** search.

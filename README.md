@@ -4,7 +4,7 @@ Diligent Code Studio is a local-first, open-source software-building workbench f
 
 ## Version
 
-0.3.7
+0.3.9
 
 ## Highlights
 
@@ -65,7 +65,7 @@ Adds a local registry for built-in and custom command shortcuts, including run/c
 The Project / Tools page now keeps Project Detection and Tool Check prominent while placing Language Support under Security Status in a slimmer, taller right column.
 
 
-## v0.3.7 Verbose Progress + Cross-Platform Package Guidance
+## v0.3.9 Verbose Progress + Cross-Platform Package Guidance
 
 Diligent Code Studio now includes visible verbose progress output for long-running tasks and initial platform-aware behavior for Windows, Linux, and macOS:
 
@@ -81,6 +81,23 @@ Diligent Code Studio now includes visible verbose progress output for long-runni
 See `CROSS_PLATFORM_NOTES.md` and `BUILD_ALL_OS_PACKAGES.md` for details.
 
 
-### v0.3.7 UI cleanup
+### v0.3.9 UI cleanup
 
 Find and Search now share one workspace page with Current File and Workspace modes.
+
+
+## Windows development launchers
+
+For normal command-line development, run:
+
+```powershell
+npm.cmd run tauri:dev
+```
+
+If you want the npm/PowerShell console minimized while testing on Windows, double-click:
+
+```text
+Start-DiligentCodeStudio-Dev-Minimized.cmd
+```
+
+The packaged release build does not require an npm console window. The console window only appears when running the app in development mode.

@@ -748,7 +748,7 @@ dependencies = [
 
 [[package]]
 name = "diligent-code-studio"
-version = "0.3.7"
+version = "0.3.9"
 dependencies = [
  "hex",
  "rfd",
