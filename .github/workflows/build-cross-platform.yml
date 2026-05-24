@@ -3,66 +3,35 @@ name: Build Diligent Code Studio Cross-Platform
 on:
   workflow_dispatch:
   push:
-    tags:
-      - "v*"
-
-permissions:
-  contents: read
+    branches: [ main ]
+    tags: [ 'v*' ]
+  pull_request:
+    branches: [ main ]
 
 jobs:
   build:
     name: Build ${{ matrix.name }}
-    runs-on: ${{ matrix.os }}
-
     strategy:
       fail-fast: false
       matrix:
         include:
           - name: Windows
-            os: windows-2022
-          - name: Linux
-            os: ubuntu-22.04
+            platform: windows-latest
+            artifact_name: diligent-code-studio-windows
           - name: macOS
-            os: macos-14
-
-    env:
-      CI: true
-      CARGO_INCREMENTAL: 0
-      CARGO_TERM_COLOR: always
-      NPM_CONFIG_AUDIT: false
-      NPM_CONFIG_FUND: false
-      NPM_CONFIG_UPDATE_NOTIFIER: false
+            platform: macos-latest
+            artifact_name: diligent-code-studio-macos
+          - name: Linux
+            platform: ubuntu-22.04
+            artifact_name: diligent-code-studio-linux
+    runs-on: ${{ matrix.platform }}
 
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v5
+      - name: Checkout
+        uses: actions/checkout@v4
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v6
-        with:
-          node-version: 22.12.0
-
-      - name: Show tool versions
-        shell: bash
-        run: |
-          echo "Runner OS: ${{ runner.os }}"
-          echo "Node:"
-          node --version
-          echo "npm:"
-          npm --version
-
-      - name: Setup Rust
-        uses: dtolnay/rust-toolchain@stable
-
-      - name: Show Rust versions
-        shell: bash
-        run: |
-          rustc --version
-          cargo --version
-
-      - name: Install Linux Tauri dependencies
-        if: runner.os == 'Linux'
-        shell: bash
+      - name: Install Linux dependencies
+        if: matrix.platform == 'ubuntu-22.04'
         run: |
           sudo apt-get update
           sudo apt-get install -y \
@@ -76,154 +45,31 @@ jobs:
             libayatana-appindicator3-dev \
             librsvg2-dev
 
-      # -----------------------------
-      # Windows dependency install
-      # -----------------------------
-      - name: Clean Windows dependency folders
-        if: runner.os == 'Windows'
-        shell: cmd
-        run: |
-          if exist node_modules rmdir /s /q node_modules
-          if exist dist rmdir /s /q dist
-          if exist src-tauri\target\release\bundle rmdir /s /q src-tauri\target\release\bundle
-          npm.cmd cache clean --force
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
 
-      - name: Install Windows frontend dependencies
-        if: runner.os == 'Windows'
-        shell: cmd
-        run: |
-          echo First attempt: npm.cmd install
-          npm.cmd install --verbose --legacy-peer-deps --no-audit --no-fund --prefer-online --fetch-timeout=300000 --fetch-retries=5
-          if errorlevel 1 (
-            echo First attempt failed. Cleaning and retrying...
-            if exist node_modules rmdir /s /q node_modules
-            npm.cmd cache clean --force
-            npm.cmd install --verbose --legacy-peer-deps --no-audit --no-fund --prefer-online --fetch-timeout=300000 --fetch-retries=5
-          )
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
 
-      - name: Verify Windows frontend dependencies
-        if: runner.os == 'Windows'
-        shell: cmd
-        run: |
-          if not exist node_modules (
-            echo ERROR: node_modules folder is missing.
-            exit /b 1
-          )
-          if not exist node_modules\.bin\tsc.cmd (
-            echo ERROR: TypeScript compiler is missing.
-            dir node_modules\.bin
-            exit /b 1
-          )
-          if not exist node_modules\.bin\vite.cmd (
-            echo ERROR: Vite is missing.
-            dir node_modules\.bin
-            exit /b 1
-          )
-          echo Windows frontend dependencies verified.
+      - name: Install npm dependencies
+        run: npm install
 
-      # -----------------------------
-      # Linux/macOS dependency install
-      # -----------------------------
-      - name: Clean Unix dependency folders
-        if: runner.os != 'Windows'
-        shell: bash
-        run: |
-          rm -rf node_modules
-          rm -rf dist
-          rm -rf src-tauri/target/release/bundle
-          npm cache clean --force || true
-
-      - name: Install Unix frontend dependencies
-        if: runner.os != 'Windows'
-        shell: bash
-        run: |
-          set +e
-
-          echo "First attempt: npm install"
-          npm install --verbose --legacy-peer-deps --no-audit --no-fund --prefer-online --fetch-timeout=300000 --fetch-retries=5
-          FIRST_EXIT=$?
-
-          if [ $FIRST_EXIT -ne 0 ]; then
-            echo "First attempt failed. Cleaning and retrying..."
-            rm -rf node_modules
-            npm cache clean --force || true
-            npm install --verbose --legacy-peer-deps --no-audit --no-fund --prefer-online --fetch-timeout=300000 --fetch-retries=5
-            SECOND_EXIT=$?
-          else
-            SECOND_EXIT=0
-          fi
-
-          if [ $SECOND_EXIT -ne 0 ]; then
-            echo "Dependency install failed."
-            exit 1
-          fi
-
-      - name: Verify Unix frontend dependencies
-        if: runner.os != 'Windows'
-        shell: bash
-        run: |
-          if [ ! -d "node_modules" ]; then
-            echo "ERROR: node_modules folder is missing."
-            exit 1
-          fi
-
-          if [ ! -f "node_modules/.bin/tsc" ]; then
-            echo "ERROR: TypeScript compiler is missing."
-            ls -la node_modules/.bin || true
-            exit 1
-          fi
-
-          if [ ! -f "node_modules/.bin/vite" ]; then
-            echo "ERROR: Vite is missing."
-            ls -la node_modules/.bin || true
-            exit 1
-          fi
-
-          echo "Unix frontend dependencies verified."
-
-      # -----------------------------
-      # Build
-      # -----------------------------
-      - name: Build frontend on Windows
-        if: runner.os == 'Windows'
-        shell: cmd
-        run: npm.cmd run build
-
-      - name: Build frontend on Unix
-        if: runner.os != 'Windows'
-        shell: bash
+      - name: TypeScript build
         run: npm run build
 
-      - name: Build Tauri app on Windows
-        if: runner.os == 'Windows'
-        shell: cmd
-        run: npm.cmd run tauri:build
+      - name: Tauri build
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Build Tauri app on Unix
-        if: runner.os != 'Windows'
-        shell: bash
-        run: npm run tauri:build
-
-      - name: List Windows bundle output
-        if: always() && runner.os == 'Windows'
-        shell: cmd
-        run: |
-          if exist src-tauri\target\release\bundle (
-            dir /s src-tauri\target\release\bundle
-          ) else (
-            echo No bundle folder found.
-          )
-
-      - name: List Unix bundle output
-        if: always() && runner.os != 'Windows'
-        shell: bash
-        run: |
-          find src-tauri/target/release/bundle -maxdepth 5 -type f -print || true
-
-      - name: Upload build artifacts
-        uses: actions/upload-artifact@v6
+      - name: Upload platform bundle artifacts
+        uses: actions/upload-artifact@v4
         with:
-          name: diligent-code-studio-${{ matrix.name }}
+          name: ${{ matrix.artifact_name }}
           path: |
             src-tauri/target/release/bundle/**
-          if-no-files-found: error
+          if-no-files-found: warn
+          retention-days: 14

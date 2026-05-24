@@ -1,5 +1,25 @@
 # Changelog
 
+## v0.4.1 - AI Code Actions
+
+- Added targeted AI Code Action buttons.
+- Added Explain Selection, Review File, Fix Problems, Explain Terminal, Commit Message, Refactor Selection, Generate Comments, and Suggest Tests actions.
+- Added Insert as Comment for AI responses.
+- Improved AI prompts to use the correct context mode automatically.
+- Kept AI provider disabled by default and preserved confirmation-before-send behavior.
+
+## 0.4.0 - AI Coding Assistant Foundation
+
+- Added AI workspace page.
+- Added optional OpenAI API provider support.
+- Added optional Ollama local provider support.
+- Added AI settings for provider, model, endpoint, API key, context mode, and confirmation behavior.
+- Added context modes for selected/current file, Problems output, Terminal output, and Git status.
+- Added copy and insert-response actions.
+- Added `.aiignore` starter file for future privacy filtering.
+- Regenerated package lock references to use the public npm registry.
+
+
 ## v0.3.9
 
 - App window now opens maximized by default while keeping normal window controls available.
@@ -16,6 +36,18 @@
 - Kept all existing Find / Replace and Search Across Files functionality.
 
 # Changelog
+
+## 0.4.0 - AI Coding Assistant Foundation
+
+- Added AI workspace page.
+- Added optional OpenAI API provider support.
+- Added optional Ollama local provider support.
+- Added AI settings for provider, model, endpoint, API key, context mode, and confirmation behavior.
+- Added context modes for selected/current file, Problems output, Terminal output, and Git status.
+- Added copy and insert-response actions.
+- Added `.aiignore` starter file for future privacy filtering.
+- Regenerated package lock references to use the public npm registry.
+
 
 ## 0.3.6
 

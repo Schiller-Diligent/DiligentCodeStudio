@@ -101,3 +101,21 @@ Start-DiligentCodeStudio-Dev-Minimized.cmd
 ```
 
 The packaged release build does not require an npm console window. The console window only appears when running the app in development mode.
+
+
+## AI Coding Assistant
+
+Version 0.4.0 adds an optional AI Coding Assistant foundation. AI is disabled by default. Configure OpenAI or Ollama from Settings, then use the AI page to ask questions about selected code, the active file, diagnostics, terminal output, or Git status.
+
+Privacy notes:
+
+- AI is optional and must be configured before use.
+- Confirmation before sending context is enabled by default.
+- OpenAI mode sends selected context to the OpenAI API.
+- Ollama mode uses a local endpoint such as `http://127.0.0.1:11434`.
+- `.aiignore` is included for future multi-file AI context filtering.
+
+
+## AI Code Actions
+
+Diligent Code Studio v0.4.1 adds optional AI Code Actions for explaining selections, reviewing the current file, fixing diagnostics, explaining terminal output, generating commit messages, suggesting refactors, creating comments, and suggesting tests. AI remains disabled by default and requires provider configuration before code/context is sent.

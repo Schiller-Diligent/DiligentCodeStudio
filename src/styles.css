@@ -2383,7 +2383,7 @@ select:focus {
   line-height: 1.2;
   color: var(--muted-text);
   background: var(--soft-panel);
-  border: 1px solid var(--border-color);
+  border: 1px solid #1e293b;
   white-space: nowrap;
   max-width: 82px;
   overflow: hidden;
@@ -2409,10 +2409,10 @@ select:focus {
 }
 
 .language-group {
-  border: 1px solid var(--border-color);
+  border: 1px solid #1e293b;
   border-radius: 10px;
   padding: 6px;
-  background: var(--panel-muted);
+  background: rgba(15, 23, 42, .72);
 }
 
 .language-group strong {
@@ -2434,7 +2434,7 @@ select:focus {
   min-height: 18px;
   padding: 1px 5px;
   border-radius: 999px;
-  border: 1px solid var(--border-color);
+  border: 1px solid #1e293b;
   background: var(--button-muted-bg);
   color: var(--muted-text);
   font-size: 10px;
@@ -3357,5 +3357,131 @@ body {
 
   .menu-order-row button {
     grid-column: span 1;
+  }
+}
+
+/* v0.4.0 AI Coding Assistant */
+.ai-page .ai-shell {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  min-height: 0;
+}
+
+.ai-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.ai-grid {
+  display: grid;
+  grid-template-columns: minmax(280px, 0.85fr) minmax(320px, 1.15fr);
+  gap: 14px;
+  min-height: 0;
+}
+
+.ai-controls-card,
+.ai-response-card {
+  border: 1px solid #1e293b;
+  background: rgba(15, 23, 42, .72);
+  border-radius: 14px;
+  padding: 14px;
+  min-height: 0;
+}
+
+.ai-prompt-box {
+  width: 100%;
+  min-height: 180px;
+  resize: vertical;
+  margin-top: 10px;
+  font-family: inherit;
+}
+
+.ai-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.ai-response-output {
+  min-height: 360px;
+  max-height: calc(100vh - 340px);
+  overflow: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+  background: #020617;
+  color: #e5e7eb;
+  border: 1px solid #1e293b;
+  border-radius: 12px;
+  padding: 12px;
+  font-family: "Cascadia Code", Consolas, monospace;
+  font-size: 13px;
+}
+
+.status-pill.warn-pill {
+  background: rgba(245, 158, 11, 0.14);
+  border-color: rgba(245, 158, 11, 0.45);
+  color: #fbbf24;
+}
+
+.status-pill.success-pill {
+  background: rgba(34, 197, 94, 0.12);
+  border-color: rgba(34, 197, 94, 0.45);
+  color: #86efac;
+}
+
+@media (max-width: 1050px) {
+  .ai-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .ai-response-output {
+    max-height: 360px;
+  }
+}
+
+/* v0.4.1 AI Code Actions */
+.ai-code-actions {
+  margin-top: 10px;
+  padding: 10px;
+  border: 1px solid rgba(59, 130, 246, 0.22);
+  background: rgba(2, 6, 23, 0.34);
+  border-radius: 12px;
+}
+
+.mini-section-title {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  color: #93c5fd;
+  margin-bottom: 8px;
+}
+
+.ai-action-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 7px;
+}
+
+.ai-action-grid button {
+  min-height: 30px;
+  padding: 5px 8px;
+  justify-content: center;
+  font-size: 12px;
+}
+
+@media (max-width: 1050px) {
+  .ai-action-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 760px) {
+  .ai-action-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }

@@ -1,4 +1,4 @@
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::fs;
 use std::io::Read;
@@ -2105,6 +2105,161 @@ fn create_project_from_template(parent_path: String, project_name: String, templ
     })
 }
 
+
+#[derive(Debug, Deserialize)]
+struct OpenAiResponseContent {
+    #[serde(default)]
+    text: String,
+}
+
+#[derive(Debug, Deserialize)]
+struct OpenAiOutputItem {
+    #[serde(default)]
+    content: Vec<OpenAiResponseContent>,
+}
+
+#[derive(Debug, Deserialize)]
+struct OpenAiResponsesApiResponse {
+    #[serde(default)]
+    output_text: String,
+    #[serde(default)]
+    output: Vec<OpenAiOutputItem>,
+}
+
+#[derive(Debug, Deserialize)]
+struct OllamaGenerateResponse {
+    #[serde(default)]
+    response: String,
+}
+
+#[derive(Debug, Serialize)]
+struct AiChatResponse {
+    provider: String,
+    model: String,
+    response: String,
+}
+
+fn trim_ai_context(value: &str) -> String {
+    const MAX_CONTEXT_CHARS: usize = 24000;
+    if value.chars().count() <= MAX_CONTEXT_CHARS {
+        return value.to_string();
+    }
+
+    let tail: String = value.chars().rev().take(MAX_CONTEXT_CHARS).collect::<Vec<char>>().into_iter().rev().collect();
+    format!("[Context trimmed to the most recent {} characters.]\n\n{}", MAX_CONTEXT_CHARS, tail)
+}
+
+#[tauri::command]
+fn ai_chat(
+    provider: String,
+    api_key: String,
+    model: String,
+    endpoint: String,
+    prompt: String,
+    context: String,
+) -> Result<AiChatResponse, String> {
+    let provider_clean = provider.trim().to_lowercase();
+    let model_clean = if model.trim().is_empty() {
+        if provider_clean == "ollama" { "codellama".to_string() } else { "gpt-4.1-mini".to_string() }
+    } else {
+        model.trim().to_string()
+    };
+
+    let context_clean = trim_ai_context(&context);
+    let system_prompt = "You are the optional Diligent Code Studio AI Coding Assistant. Help with coding, debugging, refactoring, documentation, build errors, and release notes. Be practical, security-aware, and never claim to have changed files unless the user explicitly applies changes.";
+    let user_prompt = format!(
+        "User request:\n{}\n\nContext from Diligent Code Studio:\n{}",
+        prompt.trim(),
+        context_clean
+    );
+
+    let client = reqwest::blocking::Client::builder()
+        .timeout(std::time::Duration::from_secs(120))
+        .build()
+        .map_err(|error| format!("Unable to initialize AI HTTP client: {}", error))?;
+
+    match provider_clean.as_str() {
+        "openai" => {
+            let key = api_key.trim();
+            if key.is_empty() {
+                return Err("OpenAI API key is required.".to_string());
+            }
+
+            let body = serde_json::json!({
+                "model": model_clean,
+                "input": [
+                    { "role": "system", "content": system_prompt },
+                    { "role": "user", "content": user_prompt }
+                ]
+            });
+
+            let response = client
+                .post("https://api.openai.com/v1/responses")
+                .bearer_auth(key)
+                .json(&body)
+                .send()
+                .map_err(|error| format!("OpenAI request failed: {}", error))?;
+
+            let status = response.status();
+            let text = response.text().map_err(|error| format!("OpenAI response read failed: {}", error))?;
+            if !status.is_success() {
+                return Err(format!("OpenAI returned HTTP {}: {}", status, text));
+            }
+
+            let parsed: OpenAiResponsesApiResponse = serde_json::from_str(&text)
+                .map_err(|error| format!("OpenAI response parse failed: {}\n{}", error, text))?;
+            let mut output = parsed.output_text.trim().to_string();
+            if output.is_empty() {
+                output = parsed
+                    .output
+                    .iter()
+                    .flat_map(|item| item.content.iter())
+                    .map(|content| content.text.trim())
+                    .filter(|text| !text.is_empty())
+                    .collect::<Vec<&str>>()
+                    .join("\n");
+            }
+            if output.is_empty() {
+                output = "OpenAI returned an empty response.".to_string();
+            }
+
+            Ok(AiChatResponse { provider: "OpenAI".to_string(), model: model_clean, response: output })
+        }
+        "ollama" => {
+            let base = endpoint.trim().trim_end_matches('/');
+            let url = if base.is_empty() { "http://127.0.0.1:11434/api/generate".to_string() } else { format!("{}/api/generate", base) };
+            let body = serde_json::json!({
+                "model": model_clean,
+                "prompt": format!("{}\n\n{}", system_prompt, user_prompt),
+                "stream": false
+            });
+
+            let response = client
+                .post(&url)
+                .json(&body)
+                .send()
+                .map_err(|error| format!("Ollama request failed. Is Ollama running at {}? {}", url, error))?;
+
+            let status = response.status();
+            let text = response.text().map_err(|error| format!("Ollama response read failed: {}", error))?;
+            if !status.is_success() {
+                return Err(format!("Ollama returned HTTP {}: {}", status, text));
+            }
+
+            let parsed: OllamaGenerateResponse = serde_json::from_str(&text)
+                .map_err(|error| format!("Ollama response parse failed: {}\n{}", error, text))?;
+            let output = if parsed.response.trim().is_empty() {
+                "Ollama returned an empty response.".to_string()
+            } else {
+                parsed.response
+            };
+
+            Ok(AiChatResponse { provider: "Ollama".to_string(), model: model_clean, response: output })
+        }
+        _ => Err("AI provider is disabled or unsupported. Choose OpenAI or Ollama in Settings.".to_string()),
+    }
+}
+
 #[tauri::command]
 fn calculate_sha256(path: String) -> Result<String, String> {
     let file = normalize_path(&path)?;
@@ -2157,7 +2312,8 @@ fn main() {
             open_release_folder,
             run_diagnostics,
             get_project_templates,
-            create_project_from_template
+            create_project_from_template,
+            ai_chat
         ])
         .run(tauri::generate_context!())
         .expect("error while running Diligent Code Studio");

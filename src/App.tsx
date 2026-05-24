@@ -2,6 +2,8 @@ import Editor from '@monaco-editor/react';
 import { invoke } from '@tauri-apps/api/core';
 import {
   AlertTriangle,
+  Bot,
+  BrainCircuit,
   CheckCircle2,
   ChevronRight,
   Copy,
@@ -24,6 +26,7 @@ import {
   Save,
   SaveAll,
   Search,
+  Send,
   Settings2,
   SlidersHorizontal,
   ShieldCheck,
@@ -33,7 +36,7 @@ import {
 } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { languageFromPath, languageLabelFromId, languageLabelFromPath, registerDiligentLanguages, supportedLanguageGroups } from './editorLanguages';
-import type { ActivityItem, DiagnosticProblem, DiagnosticRunResult, GitChangedFile, GitStatusInfo, OpenFile, ProjectInfo, ReleaseInfo, ReleasePackageResult, ProjectTemplate, ProjectTemplateResult, SearchResult, TerminalResult, ToolRegistryItem, ToolStatus, PlatformInfo, WorkspaceEntry } from './types';
+import type { ActivityItem, DiagnosticProblem, DiagnosticRunResult, GitChangedFile, GitStatusInfo, OpenFile, ProjectInfo, ReleaseInfo, ReleasePackageResult, ProjectTemplate, ProjectTemplateResult, SearchResult, TerminalResult, ToolRegistryItem, ToolStatus, PlatformInfo, WorkspaceEntry, AiChatResponse } from './types';
 
 function nowStamp(): string {
   return new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
@@ -124,10 +127,12 @@ type QuickCommand = {
   className?: string;
 };
 
-type WorkspacePage = 'editor' | 'findsearch' | 'terminal' | 'git' | 'problems' | 'release' | 'templates' | 'registry' | 'project' | 'logs' | 'settings';
+type WorkspacePage = 'templates' | 'editor' | 'ai' | 'findsearch' | 'terminal' | 'git' | 'problems' | 'release' | 'registry' | 'project' | 'logs' | 'settings';
 
 type ThemePreference = 'dark' | 'midnight' | 'light';
 type TerminalShellPreference = 'auto' | 'powershell' | 'pwsh' | 'cmd' | 'bash' | 'zsh';
+type AiProviderPreference = 'disabled' | 'openai' | 'ollama';
+type AiContextPreference = 'selection' | 'currentFile' | 'problems' | 'terminal' | 'git';
 
 type AppPreferences = {
   theme: ThemePreference;
@@ -143,6 +148,13 @@ type AppPreferences = {
   lastActivePage: WorkspacePage;
   rememberExpandedFolders: boolean;
   terminalShell: TerminalShellPreference;
+  aiProvider: AiProviderPreference;
+  aiOpenAiApiKey: string;
+  aiOpenAiModel: string;
+  aiOllamaEndpoint: string;
+  aiOllamaModel: string;
+  aiRequireConfirmation: boolean;
+  aiDefaultContext: AiContextPreference;
   compactMode: boolean;
   menuPageOrder: WorkspacePage[];
 };
@@ -152,6 +164,7 @@ const PREFERENCES_STORAGE_KEY = 'diligent-code-studio.preferences.v1';
 const DEFAULT_PAGE_ORDER: WorkspacePage[] = [
   'templates',
   'editor',
+  'ai',
   'findsearch',
   'terminal',
   'git',
@@ -166,6 +179,7 @@ const DEFAULT_PAGE_ORDER: WorkspacePage[] = [
 function workspacePageLabel(page: WorkspacePage): string {
   switch (page) {
     case 'editor': return 'Editor';
+    case 'ai': return 'AI';
     case 'findsearch': return 'Find/Search';
     case 'terminal': return 'Terminal';
     case 'git': return 'Git';
@@ -213,6 +227,13 @@ const DEFAULT_PREFERENCES: AppPreferences = {
   lastActivePage: 'editor',
   rememberExpandedFolders: true,
   terminalShell: 'auto',
+  aiProvider: 'disabled',
+  aiOpenAiApiKey: '',
+  aiOpenAiModel: 'gpt-4.1-mini',
+  aiOllamaEndpoint: 'http://127.0.0.1:11434',
+  aiOllamaModel: 'codellama',
+  aiRequireConfirmation: true,
+  aiDefaultContext: 'selection',
   compactMode: false,
   menuPageOrder: DEFAULT_PAGE_ORDER,
 };
@@ -226,12 +247,12 @@ function clampNumber(value: unknown, fallback: number, min: number, max: number)
 function normalizeWorkspacePage(value: unknown): WorkspacePage {
   const page = String(value);
   if (page === 'find' || page === 'search' || page === 'findsearch') return 'findsearch';
-  if (['editor', 'terminal', 'git', 'problems', 'release', 'templates', 'registry', 'project', 'logs', 'settings'].includes(page)) return page as WorkspacePage;
+  if (['editor', 'ai', 'terminal', 'git', 'problems', 'release', 'templates', 'registry', 'project', 'logs', 'settings'].includes(page)) return page as WorkspacePage;
   return DEFAULT_PREFERENCES.lastActivePage;
 }
 
 function isWorkspacePage(value: unknown): value is WorkspacePage {
-  return ['editor', 'findsearch', 'terminal', 'git', 'problems', 'release', 'templates', 'registry', 'project', 'logs', 'settings'].includes(String(value));
+  return ['editor', 'ai', 'findsearch', 'terminal', 'git', 'problems', 'release', 'templates', 'registry', 'project', 'logs', 'settings'].includes(String(value));
 }
 
 function loadPreferences(): AppPreferences {
@@ -242,6 +263,8 @@ function loadPreferences(): AppPreferences {
     const parsed = JSON.parse(raw) as Partial<AppPreferences>;
     const theme = ['dark', 'midnight', 'light'].includes(String(parsed.theme)) ? parsed.theme as ThemePreference : DEFAULT_PREFERENCES.theme;
     const terminalShell = ['auto', 'powershell', 'pwsh', 'cmd', 'bash', 'zsh'].includes(String(parsed.terminalShell)) ? parsed.terminalShell as TerminalShellPreference : DEFAULT_PREFERENCES.terminalShell;
+    const aiProvider = ['disabled', 'openai', 'ollama'].includes(String(parsed.aiProvider)) ? parsed.aiProvider as AiProviderPreference : DEFAULT_PREFERENCES.aiProvider;
+    const aiDefaultContext = ['selection', 'currentFile', 'problems', 'terminal', 'git'].includes(String(parsed.aiDefaultContext)) ? parsed.aiDefaultContext as AiContextPreference : DEFAULT_PREFERENCES.aiDefaultContext;
     const menuPageOrder = normalizePageOrder(parsed.menuPageOrder);
 
     return {
@@ -249,6 +272,8 @@ function loadPreferences(): AppPreferences {
       ...parsed,
       theme,
       terminalShell,
+      aiProvider,
+      aiDefaultContext,
       menuPageOrder,
       editorFontSize: clampNumber(parsed.editorFontSize, DEFAULT_PREFERENCES.editorFontSize, 10, 28),
       autoSaveDelaySeconds: clampNumber(parsed.autoSaveDelaySeconds, DEFAULT_PREFERENCES.autoSaveDelaySeconds, 1, 30),
@@ -526,11 +551,11 @@ export default function App() {
   const [toolStatuses, setToolStatuses] = useState<ToolStatus[]>([]);
   const [platformInfo, setPlatformInfo] = useState<PlatformInfo | null>(null);
   const [activity, setActivity] = useState<ActivityItem[]>([
-    { at: nowStamp(), level: 'info', message: 'Diligent Code Studio v0.3.6 loaded with verbose progress logging and cross-platform packaging guidance.' },
+    { at: nowStamp(), level: 'info', message: 'Diligent Code Studio v0.4.1 loaded with AI Code Actions.' },
   ]);
   const [terminalCommand, setTerminalCommand] = useState('git status');
   const [terminalOutput, setTerminalOutput] = useState(
-    'Diligent Terminal ready. Version 0.3.8 includes configurable workspace menu ordering.\n',
+    'Diligent Terminal ready. Version 0.4.1 includes AI Code Actions.\n',
   );
   const [terminalRunning, setTerminalRunning] = useState(false);
   const [terminalCollapsed, setTerminalCollapsed] = useState(false);
@@ -572,6 +597,11 @@ export default function App() {
   const [toolRegistryItems, setToolRegistryItems] = useState<ToolRegistryItem[]>(() => loadToolRegistry());
   const [registryCategoryFilter, setRegistryCategoryFilter] = useState('All');
   const [registryDraft, setRegistryDraft] = useState<ToolRegistryItem>(() => newCustomRegistryDraft());
+
+  const [aiPrompt, setAiPrompt] = useState('Explain what this code does and point out any risky areas.');
+  const [aiResponse, setAiResponse] = useState('AI Assistant ready. Configure OpenAI or Ollama in Settings, then ask about selected code, the current file, diagnostics, terminal output, or Git status.\n');
+  const [aiContextMode, setAiContextMode] = useState<AiContextPreference>(() => loadPreferences().aiDefaultContext);
+  const [aiBusy, setAiBusy] = useState(false);
 
 
   const activeFile = useMemo(
@@ -681,6 +711,7 @@ export default function App() {
   const activePageTitle = useMemo(() => {
     switch (activePage) {
       case 'editor': return activeFile ? activeFile.name : 'Editor';
+      case 'ai': return 'AI Coding Assistant';
       case 'findsearch': return findSearchMode === 'current' ? 'Find / Replace Current File' : 'Search Across Workspace';
       case 'terminal': return 'Terminal';
       case 'git': return 'Git Source Control';
@@ -884,6 +915,7 @@ export default function App() {
   function workspacePageIcon(page: WorkspacePage) {
     switch (page) {
       case 'editor': return <FileCode2 size={14} />;
+      case 'ai': return <Bot size={14} />;
       case 'findsearch': return <Search size={14} />;
       case 'terminal': return <TerminalSquare size={14} />;
       case 'git': return <GitBranch size={14} />;
@@ -1652,6 +1684,185 @@ ERROR: ${message}
     log('info', 'Problems page cleared.');
   }
 
+
+  function aiContextText(): string {
+    switch (aiContextMode) {
+      case 'selection': {
+        const selection = editorRef.current?.getSelection();
+        const selectedText = selection ? editorRef.current?.getModel()?.getValueInRange(selection) ?? '' : '';
+        if (selectedText.trim()) return `Selected code from ${activeFile?.path ?? 'current editor'}:\n\n${selectedText}`;
+        return activeFile ? `No selection was active. Current file ${activeFile.path}:\n\n${activeFile.content}` : 'No active file or selected code.';
+      }
+      case 'currentFile':
+        return activeFile ? `Current file ${activeFile.path}:\n\n${activeFile.content}` : 'No active file is open.';
+      case 'problems':
+        return diagnosticsOutput || 'No diagnostics output is available.';
+      case 'terminal':
+        return terminalOutput.slice(-12000) || 'No terminal output is available.';
+      case 'git':
+        return gitStatus ? JSON.stringify(gitStatus, null, 2) : 'No Git status has been loaded.';
+      default:
+        return '';
+    }
+  }
+
+
+  function selectedEditorText(): string {
+    const selection = editorRef.current?.getSelection?.();
+    const model = editorRef.current?.getModel?.();
+    return selection && model ? model.getValueInRange(selection) ?? '' : '';
+  }
+
+  function prepareAiCodeAction(action: string) {
+    const fileName = activeFile?.name ?? 'the current file';
+    const language = activeFile ? formatLanguageLabel(activeFile.language) : 'unknown language';
+    const hasSelection = selectedEditorText().trim().length > 0;
+
+    switch (action) {
+      case 'explain-selection':
+        setAiContextMode('selection');
+        setAiPrompt('Explain the selected code in plain English. Include what it does, important inputs/outputs, and any risky or confusing areas.');
+        break;
+      case 'review-current-file':
+        setAiContextMode('currentFile');
+        setAiPrompt(`Review ${fileName} (${language}) for bugs, security concerns, maintainability issues, and practical improvements. Give prioritized recommendations.`);
+        break;
+      case 'fix-problems':
+        setAiContextMode('problems');
+        setAiPrompt('Explain the diagnostics/build errors and provide a step-by-step fix plan. Mention exact files, line numbers, commands, and likely root cause when available.');
+        break;
+      case 'explain-terminal':
+        setAiContextMode('terminal');
+        setAiPrompt('Explain the most recent terminal output. Identify the error, likely cause, and exact commands or file edits to fix it.');
+        break;
+      case 'commit-message':
+        setAiContextMode('git');
+        setAiPrompt('Generate a concise professional Git commit message from the Git status. Include one short subject line and 2-4 optional bullet points.');
+        break;
+      case 'refactor-selection':
+        setAiContextMode('selection');
+        setAiPrompt('Suggest a safer, cleaner refactor for the selected code. Explain the changes first, then provide a replacement code block. Do not assume files were changed.');
+        break;
+      case 'add-comments':
+        setAiContextMode(hasSelection ? 'selection' : 'currentFile');
+        setAiPrompt('Generate helpful comments for the selected code or current file. Prefer concise comments that explain intent and non-obvious logic. Avoid noisy comments.');
+        break;
+      case 'unit-test':
+        setAiContextMode(hasSelection ? 'selection' : 'currentFile');
+        setAiPrompt('Suggest practical unit tests or validation steps for this code. Include edge cases, expected outcomes, and example test code when useful.');
+        break;
+      default:
+        return;
+    }
+
+    log('info', `Prepared AI code action: ${action}. Review the prompt, then click Ask AI.`);
+  }
+
+  function aiCommentText(text: string, language?: string): string {
+    const cleaned = text.trim();
+    if (!cleaned) return '';
+    const lang = String(language || '').toLowerCase();
+
+    if (['html', 'xml', 'markdown'].includes(lang)) {
+      return `<!--\n${cleaned}\n-->`;
+    }
+
+    if (['powershell', 'shell', 'python', 'ruby', 'yaml', 'toml', 'ini'].includes(lang)) {
+      return cleaned.split(/\r?\n/).map((line) => `# ${line}`).join('\n');
+    }
+
+    if (['batch'].includes(lang)) {
+      return cleaned.split(/\r?\n/).map((line) => `REM ${line}`).join('\n');
+    }
+
+    return `/*\n${cleaned}\n*/`;
+  }
+
+  function insertAiResponseAsComment() {
+    if (!activeFile || !aiResponse.trim()) return;
+    const comment = aiCommentText(aiResponse, activeFile.language);
+    const editor = editorRef.current;
+    if (editor) {
+      editor.executeEdits('diligent-ai-comment', [{
+        range: editor.getSelection() ?? editor.getModel()!.getFullModelRange(),
+        text: `${comment}\n`,
+        forceMoveMarkers: true,
+      }]);
+    } else {
+      updateActiveContent(`${activeFile.content}\n\n${comment}`);
+    }
+    log('info', 'Inserted AI response as a comment. Review before saving.');
+  }
+
+  async function askAi() {
+    const prompt = aiPrompt.trim();
+    if (!prompt) {
+      log('warn', 'Type an AI prompt first.');
+      return;
+    }
+
+    if (preferences.aiProvider === 'disabled') {
+      setActivePage('settings');
+      log('warn', 'AI provider is disabled. Configure OpenAI or Ollama in Settings first.');
+      return;
+    }
+
+    if (preferences.aiProvider === 'openai' && !preferences.aiOpenAiApiKey.trim()) {
+      setActivePage('settings');
+      log('warn', 'OpenAI API key is required before using the OpenAI provider.');
+      return;
+    }
+
+    const context = aiContextText();
+    if (preferences.aiRequireConfirmation) {
+      const confirmed = window.confirm(`Send this prompt and ${aiContextMode} context to the configured AI provider?\n\nProvider: ${preferences.aiProvider}\nPrompt length: ${prompt.length} characters\nContext length: ${context.length} characters`);
+      if (!confirmed) {
+        log('warn', 'AI request cancelled before sending context.');
+        return;
+      }
+    }
+
+    setAiBusy(true);
+    const startedAt = Date.now();
+    setAiResponse(`[${nowStamp()}] AI request started...\nProvider: ${preferences.aiProvider}\nContext: ${aiContextMode}\n`);
+
+    try {
+      const result = await invoke<AiChatResponse>('ai_chat', {
+        provider: preferences.aiProvider,
+        apiKey: preferences.aiOpenAiApiKey,
+        model: preferences.aiProvider === 'openai' ? preferences.aiOpenAiModel : preferences.aiOllamaModel,
+        endpoint: preferences.aiOllamaEndpoint,
+        prompt,
+        context,
+      });
+
+      setAiResponse([
+        `[${nowStamp()}] AI response returned after ${elapsedSeconds(startedAt)}s.`,
+        `Provider: ${result.provider}`,
+        `Model: ${result.model}`,
+        '',
+        result.response,
+      ].join('\n'));
+      log('success', `AI response received from ${result.provider} using ${result.model}.`);
+    } catch (error) {
+      setAiResponse(`[${nowStamp()}] AI request failed after ${elapsedSeconds(startedAt)}s.\nERROR: ${String(error)}\n`);
+      log('error', `AI request failed: ${String(error)}`);
+    } finally {
+      setAiBusy(false);
+    }
+  }
+
+  function insertAiResponseIntoEditor() {
+    if (!activeFile || !aiResponse.trim()) return;
+    const editor = editorRef.current;
+    if (editor) {
+      editor.executeEdits('diligent-ai-insert', [{ range: editor.getSelection() ?? editor.getModel()!.getFullModelRange(), text: aiResponse, forceMoveMarkers: true }]);
+    } else {
+      updateActiveContent(`${activeFile.content}\n\n${aiResponse}`);
+    }
+    log('info', 'Inserted AI response into the active editor. Review before saving.');
+  }
+
   async function runTerminalCommand(command = terminalCommand, force = false) {
     const cleanCommand = command.trim();
     if (!cleanCommand) {
@@ -2274,7 +2485,7 @@ ERROR: ${String(error)}
                 <div className="welcome-card editor-welcome-card">
                   <ShieldCheck size={48} />
                   <h2>Open a file to start editing.</h2>
-                  <p>Version 0.3.8 adds configurable top menu button order with Templates first by default.</p>
+                  <p>Version 0.4.1 adds AI Code Actions for practical coding help.</p>
                   <div className="recent-files-card">
                     <div className="recent-files-header">
                       <strong>Recent Files</strong>
@@ -2306,6 +2517,75 @@ ERROR: ${String(error)}
               <span className={activeFile?.dirty ? 'dirty-status' : 'clean-status'}>{activeFile?.dirty ? 'Unsaved changes' : 'Saved'}</span>
               <code>{activeFile?.sha256 ? `SHA-256: ${activeFile.sha256}` : 'No active hash'}</code>
             </div>
+          </section>
+        )}
+
+
+        {activePage === 'ai' && (
+          <section className="page-content utility-page ai-page">
+            <section className="panel ai-shell large-panel">
+              <div className="ai-header">
+                <div>
+                  <div className="panel-title"><Bot size={16} /> AI Coding Assistant</div>
+                  <p className="muted-note">Optional, privacy-aware coding help. Configure OpenAI or Ollama in Settings. The app asks before sending code when confirmation is enabled.</p>
+                </div>
+                <span className={`status-pill ${preferences.aiProvider === 'disabled' ? 'warn-pill' : 'success-pill'}`}>
+                  {preferences.aiProvider === 'disabled' ? 'AI Disabled' : `${preferences.aiProvider === 'openai' ? 'OpenAI' : 'Ollama'} Ready`}
+                </span>
+              </div>
+
+              <div className="ai-grid">
+                <section className="ai-controls-card">
+                  <label className="setting-row">
+                    <span>Context</span>
+                    <select value={aiContextMode} onChange={(event) => setAiContextMode(event.target.value as AiContextPreference)}>
+                      <option value="selection">Selected code / active file fallback</option>
+                      <option value="currentFile">Current file</option>
+                      <option value="problems">Problems / diagnostics output</option>
+                      <option value="terminal">Recent terminal output</option>
+                      <option value="git">Git status summary</option>
+                    </select>
+                  </label>
+                  <textarea
+                    className="ai-prompt-box"
+                    value={aiPrompt}
+                    onChange={(event) => setAiPrompt(event.target.value)}
+                    placeholder="Ask the AI to explain, debug, refactor, document, or improve code..."
+                  />
+                  <div className="ai-code-actions">
+                    <div className="mini-section-title">Code Actions</div>
+                    <div className="ai-action-grid">
+                      <button type="button" onClick={() => prepareAiCodeAction('explain-selection')} disabled={aiBusy || !activeFile}>Explain Selection</button>
+                      <button type="button" onClick={() => prepareAiCodeAction('review-current-file')} disabled={aiBusy || !activeFile}>Review File</button>
+                      <button type="button" onClick={() => prepareAiCodeAction('fix-problems')} disabled={aiBusy}>Fix Problems</button>
+                      <button type="button" onClick={() => prepareAiCodeAction('explain-terminal')} disabled={aiBusy}>Explain Terminal</button>
+                      <button type="button" onClick={() => prepareAiCodeAction('commit-message')} disabled={aiBusy}>Commit Message</button>
+                      <button type="button" onClick={() => prepareAiCodeAction('refactor-selection')} disabled={aiBusy || !activeFile}>Refactor Selection</button>
+                      <button type="button" onClick={() => prepareAiCodeAction('add-comments')} disabled={aiBusy || !activeFile}>Generate Comments</button>
+                      <button type="button" onClick={() => prepareAiCodeAction('unit-test')} disabled={aiBusy || !activeFile}>Suggest Tests</button>
+                    </div>
+                  </div>
+                  <div className="ai-actions">
+                    <button onClick={askAi} disabled={aiBusy || preferences.aiProvider === 'disabled'}><Send size={14} /> {aiBusy ? 'Working...' : 'Ask AI'}</button>
+                    <button onClick={() => { setAiContextMode('selection'); setAiPrompt('Explain the selected code and identify possible bugs, security concerns, and maintainability improvements.'); }} disabled={aiBusy}>Explain / Review</button>
+                    <button onClick={() => { setAiContextMode('problems'); setAiPrompt('Use the Problems output to explain the build error and recommend the exact files or commands to fix it.'); }} disabled={aiBusy}>Explain Problems</button>
+                    <button onClick={() => { setAiContextMode('git'); setAiPrompt('Create a concise Git commit message based on the Git status context.'); }} disabled={aiBusy}>Commit Message</button>
+                  </div>
+                  <p className="muted-note">Sensitive files should be excluded with <code>.aiignore</code>. v0.4.1 prepares targeted prompts, asks before sending context when enabled, and never changes files without a manual action.</p>
+                </section>
+
+                <section className="ai-response-card">
+                  <div className="panel-title"><BrainCircuit size={16} /> Response</div>
+                  <pre className="ai-response-output">{aiResponse}</pre>
+                  <div className="ai-actions">
+                    <button onClick={() => navigator.clipboard.writeText(aiResponse)} disabled={!aiResponse.trim()}><Copy size={14} /> Copy</button>
+                    <button onClick={insertAiResponseIntoEditor} disabled={!activeFile || !aiResponse.trim()}><Edit3 size={14} /> Insert into Editor</button>
+                    <button onClick={insertAiResponseAsComment} disabled={!activeFile || !aiResponse.trim()}><Edit3 size={14} /> Insert as Comment</button>
+                    <button onClick={() => setAiResponse('AI Assistant ready.\n')}><Trash2 size={14} /> Clear</button>
+                  </div>
+                </section>
+              </div>
+            </section>
           </section>
         )}
 
@@ -3158,6 +3438,56 @@ ERROR: ${String(error)}
                 <label className="setting-check">
                   <input type="checkbox" checked={preferences.rememberExpandedFolders} onChange={(event) => updatePreference('rememberExpandedFolders', event.target.checked)} />
                   Remember collapsed/expanded folders per workspace
+                </label>
+              </section>
+
+
+              <section className="panel settings-panel wide-settings-panel">
+                <div className="panel-title"><Bot size={16} /> AI Assistant</div>
+                <p className="muted-note">AI is optional. OpenAI sends selected context to the OpenAI API. Ollama uses a local endpoint, usually <code>http://127.0.0.1:11434</code>.</p>
+                <label className="setting-row">
+                  <span>Provider</span>
+                  <select value={preferences.aiProvider} onChange={(event) => updatePreference('aiProvider', event.target.value as AiProviderPreference)}>
+                    <option value="disabled">Disabled</option>
+                    <option value="openai">OpenAI API</option>
+                    <option value="ollama">Ollama Local</option>
+                  </select>
+                </label>
+                <label className="setting-row setting-row-wide">
+                  <span>OpenAI API key</span>
+                  <input
+                    type="password"
+                    value={preferences.aiOpenAiApiKey}
+                    onChange={(event) => updatePreference('aiOpenAiApiKey', event.target.value)}
+                    placeholder="sk-..."
+                    spellCheck={false}
+                  />
+                </label>
+                <label className="setting-row">
+                  <span>OpenAI model</span>
+                  <input value={preferences.aiOpenAiModel} onChange={(event) => updatePreference('aiOpenAiModel', event.target.value)} spellCheck={false} />
+                </label>
+                <label className="setting-row setting-row-wide">
+                  <span>Ollama endpoint</span>
+                  <input value={preferences.aiOllamaEndpoint} onChange={(event) => updatePreference('aiOllamaEndpoint', event.target.value)} spellCheck={false} />
+                </label>
+                <label className="setting-row">
+                  <span>Ollama model</span>
+                  <input value={preferences.aiOllamaModel} onChange={(event) => updatePreference('aiOllamaModel', event.target.value)} spellCheck={false} />
+                </label>
+                <label className="setting-row">
+                  <span>Default AI context</span>
+                  <select value={preferences.aiDefaultContext} onChange={(event) => updatePreference('aiDefaultContext', event.target.value as AiContextPreference)}>
+                    <option value="selection">Selected code</option>
+                    <option value="currentFile">Current file</option>
+                    <option value="problems">Problems output</option>
+                    <option value="terminal">Terminal output</option>
+                    <option value="git">Git status</option>
+                  </select>
+                </label>
+                <label className="setting-check">
+                  <input type="checkbox" checked={preferences.aiRequireConfirmation} onChange={(event) => updatePreference('aiRequireConfirmation', event.target.checked)} />
+                  Require confirmation before sending code/context to AI
                 </label>
               </section>
 

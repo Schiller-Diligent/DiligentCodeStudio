@@ -170,3 +170,10 @@ export type ToolRegistryItem = {
   enabled: boolean;
   builtIn: boolean;
 };
+
+
+export type AiChatResponse = {
+  provider: string;
+  model: string;
+  response: string;
+};

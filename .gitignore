@@ -12,6 +12,9 @@ src-tauri/target/
 
 # Release output
 releases/
+logs/
+
+# Installer/package outputs
 *.zip
 *.msi
 *.exe
@@ -40,7 +43,7 @@ Thumbs.db
 .idea/
 .vs/
 
-# Debug symbols / binaries
+# Rust/Windows generated large files
 *.pdb
 *.rlib
 *.rmeta
