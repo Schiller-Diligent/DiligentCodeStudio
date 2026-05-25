@@ -38,3 +38,8 @@
 - More complete interactive terminal
 - Settings export/import
 
+
+
+## v0.4.4 Completed
+
+- Dependency Setup Center with tool checks, installer buttons, setup logs, and website links.

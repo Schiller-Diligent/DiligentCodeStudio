@@ -7,7 +7,7 @@ cd "$ROOT_DIR"
 echo "== Diligent Code Studio Linux/macOS Release Helper =="
 echo "Workspace: $ROOT_DIR"
 
-npm install
+if [ -f package-lock.json ]; then npm ci; else npm install; fi
 npm run build
 npm run tauri:build
 

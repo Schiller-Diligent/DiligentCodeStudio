@@ -17,7 +17,7 @@ Write-Host "ProjectRoot: $ProjectRoot"
 
 Push-Location $ProjectRoot
 try {
-    npm.cmd install
+    if (Test-Path ".\package-lock.json") { npm.cmd ci } else { npm.cmd install }
     npm.cmd run tauri:build
 
     $BundleRoot = Join-Path $ProjectRoot "src-tauri\target\release\bundle"

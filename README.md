@@ -118,4 +118,21 @@ Privacy notes:
 
 ## AI Code Actions
 
-Diligent Code Studio v0.4.1 adds optional AI Code Actions for explaining selections, reviewing the current file, fixing diagnostics, explaining terminal output, generating commit messages, suggesting refactors, creating comments, and suggesting tests. AI remains disabled by default and requires provider configuration before code/context is sent.
+Diligent Code Studio v0.4.2 adds optional AI Code Actions for explaining selections, reviewing the current file, fixing diagnostics, explaining terminal output, generating commit messages, suggesting refactors, creating comments, and suggesting tests. AI remains disabled by default and requires provider configuration before code/context is sent.
+
+
+
+## v0.4.4 AI editor dock
+
+The AI Assistant now opens by default on the Editor page and can be hidden or shown with the top toolbar **Show AI / Hide AI** button. The dock is visible even before a file is opened so users can test AI setup, copy/paste responses, and keep coding context beside the editor.
+
+## v0.4.2 AI usability notes
+
+- Ollama users can refresh local models and choose from a dropdown in Settings.
+- The Editor page includes a docked AI panel for easier copy, paste, insert, and comment workflows.
+- Ollama should be running locally before refreshing models. The default endpoint is `http://127.0.0.1:11434`.
+
+
+## v0.4.4 Dependency Setup Center
+
+This version adds a Setup page that lists required and optional dependencies, checks installed versions, provides Open Website links, and offers guarded installer buttons where supported.

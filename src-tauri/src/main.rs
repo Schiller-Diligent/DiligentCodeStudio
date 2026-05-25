@@ -57,6 +57,23 @@ struct ToolStatus {
     hint: String,
 }
 
+
+#[derive(Debug, Serialize, Clone)]
+struct SetupDependency {
+    id: String,
+    name: String,
+    category: String,
+    description: String,
+    command: String,
+    available: bool,
+    version: String,
+    required: bool,
+    install_supported: bool,
+    install_command: String,
+    website: String,
+    caution: String,
+}
+
 #[derive(Debug, Serialize)]
 struct PlatformInfo {
     os: String,
@@ -633,6 +650,380 @@ fn check_development_tools() -> Result<Vec<ToolStatus>, String> {
     }
 
     Ok(tools)
+}
+
+
+#[cfg(target_os = "windows")]
+fn detect_visual_studio_build_tools() -> Option<String> {
+    let vswhere_paths = [
+        r"C:\Program Files (x86)\Microsoft Visual Studio\Installer\vswhere.exe",
+        r"C:\Program Files\Microsoft Visual Studio\Installer\vswhere.exe",
+    ];
+
+    for vswhere in vswhere_paths {
+        if Path::new(vswhere).exists() {
+            let output = Command::new(vswhere)
+                .args([
+                    "-latest",
+                    "-products",
+                    "*",
+                    "-requires",
+                    "Microsoft.VisualStudio.Component.VC.Tools.x86.x64",
+                    "-property",
+                    "installationPath",
+                ])
+                .output();
+
+            if let Ok(value) = output {
+                if value.status.success() {
+                    let install_path = String::from_utf8_lossy(&value.stdout).trim().to_string();
+                    if !install_path.is_empty() {
+                        return Some(format!("Installed at {}", install_path));
+                    }
+                }
+            }
+        }
+    }
+
+    let common_paths = [
+        r"C:\Program Files\Microsoft Visual Studio\2022\BuildTools\VC\Tools\MSVC",
+        r"C:\Program Files\Microsoft Visual Studio\2022\Community\VC\Tools\MSVC",
+        r"C:\Program Files\Microsoft Visual Studio\2022\Professional\VC\Tools\MSVC",
+        r"C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Tools\MSVC",
+    ];
+
+    for path in common_paths {
+        if Path::new(path).exists() {
+            return Some(format!("Installed. MSVC tools found at {}", path));
+        }
+    }
+
+    None
+}
+
+#[cfg(target_os = "windows")]
+fn setup_visual_studio_build_tools_dependency() -> SetupDependency {
+    let mut dep = setup_dependency(
+        "vsbuildtools",
+        "Visual Studio C++ Build Tools",
+        "Core Development",
+        "Required on Windows for Rust/Tauri MSVC linking, including link.exe.",
+        "link.exe",
+        &[],
+        true,
+        "winget install --id Microsoft.VisualStudio.2022.BuildTools -e",
+        "https://visualstudio.microsoft.com/visual-cpp-build-tools/",
+        "If Build Tools are already installed, open Visual Studio Installer and confirm Desktop development with C++ / MSVC build tools are selected.",
+    );
+
+    if let Some(version) = detect_visual_studio_build_tools() {
+        dep.available = true;
+        dep.version = format!("{}; link.exe may only be visible inside Developer PowerShell/Command Prompt.", version);
+    }
+
+    dep
+}
+
+#[cfg(target_os = "windows")]
+fn winget_existing_install_is_ok(stdout: &str, stderr: &str) -> bool {
+    let combined = format!("{}\n{}", stdout, stderr).to_lowercase();
+    combined.contains("found an existing package already installed")
+        || combined.contains("no available upgrade found")
+        || combined.contains("no newer package versions are available")
+        || combined.contains("already installed")
+}
+
+
+fn setup_dependency(
+    id: &str,
+    name: &str,
+    category: &str,
+    description: &str,
+    command: &str,
+    version_args: &[&str],
+    required: bool,
+    install_command: &str,
+    website: &str,
+    caution: &str,
+) -> SetupDependency {
+    let available = if command.trim().is_empty() { false } else { tool_available(command) };
+    let version = if available && !command.trim().is_empty() {
+        command_version(command, version_args)
+    } else {
+        "Not installed or not found on PATH".to_string()
+    };
+
+    SetupDependency {
+        id: id.to_string(),
+        name: name.to_string(),
+        category: category.to_string(),
+        description: description.to_string(),
+        command: command.to_string(),
+        available,
+        version,
+        required,
+        install_supported: !install_command.trim().is_empty(),
+        install_command: install_command.to_string(),
+        website: website.to_string(),
+        caution: caution.to_string(),
+    }
+}
+
+
+fn setup_ollama_dependency(install_command: &str, website: &str) -> SetupDependency {
+    let mut dep = setup_dependency(
+        "ollama",
+        "Ollama",
+        "AI Tools",
+        "Optional local AI runtime for private/offline model-assisted coding.",
+        "ollama",
+        &["--version"],
+        false,
+        install_command,
+        website,
+        "Models are downloaded separately and may require several GB of disk space.",
+    );
+
+    match get_ollama_status("http://127.0.0.1:11434".to_string()) {
+        Ok(status) => {
+            if status.running || status.installed {
+                dep.available = true;
+                dep.version = if !status.version.trim().is_empty() {
+                    status.version
+                } else if status.running {
+                    format!("Local API running at {}. CLI not found on PATH for this app session.", status.endpoint)
+                } else {
+                    status.message
+                };
+            } else {
+                dep.available = false;
+                dep.version = status.message;
+            }
+        }
+        Err(error) => {
+            if dep.available {
+                dep.version = format!("{}; API status check failed: {}", dep.version, error);
+            } else {
+                dep.version = format!("Not installed or not found on PATH. API status check failed: {}", error);
+            }
+        }
+    }
+
+    dep
+}
+
+fn setup_dependency_definitions() -> Vec<SetupDependency> {
+    let mut deps = Vec::new();
+
+    #[cfg(target_os = "windows")]
+    {
+        deps.push(setup_dependency(
+            "winget",
+            "Windows Package Manager",
+            "Install Helper",
+            "Used by Diligent Code Studio to launch guided installs for common developer tools.",
+            "winget",
+            &["--version"],
+            true,
+            "",
+            "https://learn.microsoft.com/windows/package-manager/winget/",
+            "winget is normally installed with App Installer from Microsoft Store. If missing, install App Installer first.",
+        ));
+        deps.push(setup_dependency(
+            "git",
+            "Git",
+            "Core Development",
+            "Required for source control, Git page features, repository history, tags, and releases.",
+            "git",
+            &["--version"],
+            true,
+            "winget install --id Git.Git -e",
+            "https://git-scm.com/download/win",
+            "After installing Git, close and reopen Diligent Code Studio so PATH updates are detected.",
+        ));
+        deps.push(setup_dependency(
+            "nodejs",
+            "Node.js / npm",
+            "Core Development",
+            "Required to build the React/Vite frontend and run npm scripts.",
+            "node",
+            &["--version"],
+            true,
+            "winget install --id OpenJS.NodeJS.LTS -e",
+            "https://nodejs.org/",
+            "Install the LTS version. Restart terminals and Diligent Code Studio after installation.",
+        ));
+        deps.push(setup_dependency(
+            "rust",
+            "Rust / Cargo",
+            "Core Development",
+            "Required to build the Tauri desktop backend.",
+            "cargo",
+            &["--version"],
+            true,
+            "winget install --id Rustlang.Rustup -e",
+            "https://www.rust-lang.org/tools/install",
+            "Rustup updates PATH. Restart terminals and run rustup default stable-msvc if needed.",
+        ));
+        deps.push(setup_visual_studio_build_tools_dependency());
+        deps.push(setup_dependency(
+            "powershell7",
+            "PowerShell 7",
+            "Optional Build Tools",
+            "Optional modern PowerShell shell for terminal workflows and scripts.",
+            "pwsh.exe",
+            &["-NoProfile", "-Command", "$PSVersionTable.PSVersion.ToString()"],
+            false,
+            "winget install --id Microsoft.PowerShell -e",
+            "https://learn.microsoft.com/powershell/",
+            "Windows PowerShell works without this, but PowerShell 7 is useful for cross-platform scripts.",
+        ));
+        deps.push(setup_dependency(
+            "dotnet",
+            ".NET SDK",
+            "Optional Build Tools",
+            "Optional SDK for C#/.NET projects and templates.",
+            "dotnet",
+            &["--version"],
+            false,
+            "winget install --id Microsoft.DotNet.SDK.9 -e",
+            "https://dotnet.microsoft.com/download",
+            "Install only if you plan to build C#/.NET projects from Diligent Code Studio.",
+        ));
+        deps.push(setup_ollama_dependency(
+            "winget install --id Ollama.Ollama -e",
+            "https://ollama.com/download/windows",
+        ));
+        deps.push(setup_dependency(
+            "githubcli",
+            "GitHub CLI",
+            "Optional Build Tools",
+            "Optional command-line helper for GitHub authentication, releases, and workflows.",
+            "gh",
+            &["--version"],
+            false,
+            "winget install --id GitHub.cli -e",
+            "https://cli.github.com/",
+            "Useful for advanced GitHub release and workflow automation.",
+        ));
+        deps.push(setup_dependency(
+            "innosetup",
+            "Inno Setup",
+            "Optional Packaging",
+            "Optional Windows installer compiler for custom setup packages.",
+            "ISCC.exe",
+            &["/?"],
+            false,
+            "winget install --id JRSoftware.InnoSetup -e",
+            "https://jrsoftware.org/isinfo.php",
+            "Useful if you want custom Windows installer scripts beyond Tauri bundles.",
+        ));
+    }
+
+    #[cfg(not(target_os = "windows"))]
+    {
+        deps.push(setup_dependency("git", "Git", "Core Development", "Required for source control and Git page features.", "git", &["--version"], true, "", "https://git-scm.com/downloads", "Install with your operating system package manager."));
+        deps.push(setup_dependency("nodejs", "Node.js / npm", "Core Development", "Required to build the React/Vite frontend.", "node", &["--version"], true, "", "https://nodejs.org/", "Install Node.js LTS with your platform package manager or official installer."));
+        deps.push(setup_dependency("rust", "Rust / Cargo", "Core Development", "Required to build the Tauri desktop backend.", "cargo", &["--version"], true, "", "https://www.rust-lang.org/tools/install", "Install Rust with rustup."));
+        deps.push(setup_dependency("powershell7", "PowerShell 7", "Optional Build Tools", "Optional shell for cross-platform PowerShell scripts.", "pwsh", &["-NoProfile", "-Command", "$PSVersionTable.PSVersion.ToString()"], false, "", "https://learn.microsoft.com/powershell/", "Optional unless you want pwsh-based workflows."));
+        deps.push(setup_dependency("dotnet", ".NET SDK", "Optional Build Tools", "Optional SDK for C#/.NET projects and templates.", "dotnet", &["--version"], false, "", "https://dotnet.microsoft.com/download", "Install only if you plan to build C#/.NET projects."));
+        deps.push(setup_ollama_dependency("", "https://ollama.com/download"));
+        deps.push(setup_dependency("githubcli", "GitHub CLI", "Optional Build Tools", "Optional command-line helper for GitHub authentication, releases, and workflows.", "gh", &["--version"], false, "", "https://cli.github.com/", "Useful for advanced GitHub release and workflow automation."));
+    }
+
+    deps
+}
+
+#[tauri::command]
+fn check_setup_dependencies() -> Result<Vec<SetupDependency>, String> {
+    Ok(setup_dependency_definitions())
+}
+
+#[tauri::command]
+fn install_setup_dependency(dependency_id: String) -> Result<TerminalResult, String> {
+    let dep = setup_dependency_definitions()
+        .into_iter()
+        .find(|item| item.id == dependency_id)
+        .ok_or_else(|| format!("Unknown dependency id: {}", dependency_id))?;
+
+    if !dep.install_supported || dep.install_command.trim().is_empty() {
+        return Err(format!("{} does not have an automatic installer for this platform. Use the Open Website button instead.", dep.name));
+    }
+
+    let cwd = std::env::current_dir().map_err(|error| error.to_string())?;
+    let command_text = dep.install_command.clone();
+
+    #[cfg(target_os = "windows")]
+    let output = Command::new("cmd.exe")
+        .args(["/C", command_text.as_str()])
+        .current_dir(&cwd)
+        .output()
+        .map_err(|error| format!("Unable to start installer command: {}", error))?;
+
+    #[cfg(not(target_os = "windows"))]
+    let output = Command::new(default_shell_command())
+        .arg("-lc")
+        .arg(command_text.as_str())
+        .current_dir(&cwd)
+        .output()
+        .map_err(|error| format!("Unable to start installer command: {}", error))?;
+
+    let mut stdout_text = String::from_utf8_lossy(&output.stdout).to_string();
+    let stderr_text = String::from_utf8_lossy(&output.stderr).to_string();
+    let mut success = output.status.success();
+    let mut exit_code = output.status.code().unwrap_or(-1);
+
+    #[cfg(target_os = "windows")]
+    {
+        if !success && command_text.trim_start().to_lowercase().starts_with("winget ") && winget_existing_install_is_ok(&stdout_text, &stderr_text) {
+            success = true;
+            exit_code = 0;
+            stdout_text.push_str("
+Diligent Code Studio note: winget reported this package is already installed or up to date. Treating this as success.
+");
+        }
+    }
+
+    Ok(TerminalResult {
+        command: command_text,
+        cwd: cwd.to_string_lossy().to_string(),
+        exit_code,
+        stdout: stdout_text,
+        stderr: stderr_text,
+        success,
+    })
+}
+
+#[tauri::command]
+fn open_external_url(url: String) -> Result<(), String> {
+    let trimmed = url.trim();
+    if !(trimmed.starts_with("https://") || trimmed.starts_with("http://")) {
+        return Err("Only http:// and https:// URLs can be opened from this command.".to_string());
+    }
+
+    #[cfg(target_os = "windows")]
+    let status = Command::new("cmd.exe")
+        .args(["/C", "start", "", trimmed])
+        .status()
+        .map_err(|error| format!("Unable to open URL: {}", error))?;
+
+    #[cfg(target_os = "macos")]
+    let status = Command::new("open")
+        .arg(trimmed)
+        .status()
+        .map_err(|error| format!("Unable to open URL: {}", error))?;
+
+    #[cfg(all(not(target_os = "windows"), not(target_os = "macos")))]
+    let status = Command::new("xdg-open")
+        .arg(trimmed)
+        .status()
+        .map_err(|error| format!("Unable to open URL: {}", error))?;
+
+    if status.success() {
+        Ok(())
+    } else {
+        Err(format!("Open URL command exited with status: {}", status))
+    }
 }
 
 #[tauri::command]
@@ -2132,6 +2523,35 @@ struct OllamaGenerateResponse {
     response: String,
 }
 
+#[derive(Debug, Deserialize)]
+struct OllamaTagsResponse {
+    #[serde(default)]
+    models: Vec<OllamaModelInfo>,
+}
+
+#[derive(Debug, Deserialize, Serialize, Clone)]
+struct OllamaModelInfo {
+    name: String,
+    #[serde(default)]
+    modified_at: String,
+    #[serde(default)]
+    size: u64,
+    #[serde(default)]
+    digest: String,
+}
+
+
+#[derive(Debug, Serialize)]
+struct OllamaStatusInfo {
+    installed: bool,
+    version: String,
+    running: bool,
+    endpoint: String,
+    model_count: usize,
+    models: Vec<OllamaModelInfo>,
+    message: String,
+}
+
 #[derive(Debug, Serialize)]
 struct AiChatResponse {
     provider: String,
@@ -2147,6 +2567,180 @@ fn trim_ai_context(value: &str) -> String {
 
     let tail: String = value.chars().rev().take(MAX_CONTEXT_CHARS).collect::<Vec<char>>().into_iter().rev().collect();
     format!("[Context trimmed to the most recent {} characters.]\n\n{}", MAX_CONTEXT_CHARS, tail)
+}
+
+fn normalize_ollama_endpoint(endpoint: &str) -> String {
+    let base = endpoint.trim().trim_end_matches('/');
+    if base.is_empty() {
+        "http://127.0.0.1:11434".to_string()
+    } else if base.ends_with("/api") {
+        base.trim_end_matches("/api").to_string()
+    } else if base.ends_with("/api/generate") {
+        base.trim_end_matches("/api/generate").to_string()
+    } else if base.ends_with("/api/tags") {
+        base.trim_end_matches("/api/tags").to_string()
+    } else {
+        base.to_string()
+    }
+}
+
+#[tauri::command]
+fn list_ollama_models(endpoint: String) -> Result<Vec<OllamaModelInfo>, String> {
+    let base = normalize_ollama_endpoint(&endpoint);
+    let url = format!("{}/api/tags", base);
+    let client = reqwest::blocking::Client::builder()
+        .timeout(std::time::Duration::from_secs(20))
+        .build()
+        .map_err(|error| format!("Unable to initialize Ollama HTTP client: {}", error))?;
+
+    let response = client
+        .get(&url)
+        .send()
+        .map_err(|error| format!("Could not contact Ollama at {}. Install/start Ollama, then try Refresh Models. {}", url, error))?;
+
+    let status = response.status();
+    let text = response.text().map_err(|error| format!("Ollama model list response read failed: {}", error))?;
+    if !status.is_success() {
+        return Err(format!("Ollama returned HTTP {} from {}: {}", status, url, text));
+    }
+
+    let parsed: OllamaTagsResponse = serde_json::from_str(&text)
+        .map_err(|error| format!("Ollama model list parse failed: {}\n{}", error, text))?;
+
+    Ok(parsed.models)
+}
+
+fn ollama_version_status() -> (bool, String) {
+    let mut candidates = vec!["ollama".to_string()];
+
+    #[cfg(target_os = "windows")]
+    {
+        if let Ok(local_app_data) = std::env::var("LOCALAPPDATA") {
+            candidates.push(format!(r"{}\Programs\Ollama\ollama.exe", local_app_data));
+            candidates.push(format!(r"{}\Ollama\ollama.exe", local_app_data));
+        }
+        if let Ok(program_files) = std::env::var("ProgramFiles") {
+            candidates.push(format!(r"{}\Ollama\ollama.exe", program_files));
+        }
+    }
+
+    candidates.sort();
+    candidates.dedup();
+
+    for command in candidates {
+        let output = std::process::Command::new(&command)
+            .arg("--version")
+            .output();
+
+        if let Ok(value) = output {
+            let stdout = String::from_utf8_lossy(&value.stdout).trim().to_string();
+            let stderr = String::from_utf8_lossy(&value.stderr).trim().to_string();
+            let version_text = if !stdout.is_empty() { stdout } else { stderr };
+            if value.status.success() || version_text.to_lowercase().contains("ollama") {
+                return (true, version_text);
+            }
+        }
+    }
+
+    (false, String::new())
+}
+
+fn ollama_endpoint_candidates(endpoint: &str) -> Vec<String> {
+    let base = normalize_ollama_endpoint(endpoint);
+    let mut candidates = vec![base.clone()];
+
+    if base.contains("127.0.0.1") {
+        candidates.push(base.replace("127.0.0.1", "localhost"));
+    } else if base.contains("localhost") {
+        candidates.push(base.replace("localhost", "127.0.0.1"));
+    } else if base.trim().is_empty() {
+        candidates.push("http://localhost:11434".to_string());
+    }
+
+    candidates.sort();
+    candidates.dedup();
+    candidates
+}
+
+#[tauri::command]
+fn get_ollama_status(endpoint: String) -> Result<OllamaStatusInfo, String> {
+    let (cli_installed, cli_version) = ollama_version_status();
+    let candidates = ollama_endpoint_candidates(&endpoint);
+    let preferred_endpoint = candidates
+        .first()
+        .cloned()
+        .unwrap_or_else(|| "http://127.0.0.1:11434".to_string());
+
+    let client = reqwest::blocking::Client::builder()
+        .timeout(std::time::Duration::from_secs(6))
+        .build()
+        .map_err(|error| format!("Unable to initialize Ollama status HTTP client: {}", error))?;
+
+    let mut last_message = String::new();
+
+    for base in &candidates {
+        let url = format!("{}/api/tags", base);
+        match client.get(&url).send() {
+            Ok(response) => {
+                let status = response.status();
+                let text = response.text().unwrap_or_default();
+                if !status.is_success() {
+                    last_message = format!("Ollama responded at {} but returned HTTP {}. {}", url, status, text);
+                    continue;
+                }
+
+                match serde_json::from_str::<OllamaTagsResponse>(&text) {
+                    Ok(parsed) => {
+                        let count = parsed.models.len();
+                        let message = if count == 0 {
+                            "Ollama is running, but no models are installed. Run: ollama pull llama3.2".to_string()
+                        } else {
+                            format!("Ollama is running. {} local model(s) detected.", count)
+                        };
+                        let version = if !cli_version.trim().is_empty() {
+                            cli_version.clone()
+                        } else {
+                            "Local Ollama API is running. CLI was not found on PATH for this app session.".to_string()
+                        };
+
+                        return Ok(OllamaStatusInfo {
+                            installed: true,
+                            version,
+                            running: true,
+                            endpoint: base.clone(),
+                            model_count: count,
+                            models: parsed.models,
+                            message,
+                        });
+                    }
+                    Err(error) => {
+                        last_message = format!("Ollama responded at {} but the model list could not be parsed: {}", url, error);
+                    }
+                }
+            }
+            Err(error) => {
+                last_message = format!("Could not contact Ollama at {}. {}", url, error);
+            }
+        }
+    }
+
+    let installed = cli_installed;
+    let version = cli_version;
+    let message = if installed {
+        format!("Ollama appears to be installed, but the local API is not responding. Checked {}. Start Ollama, then try Refresh Models. {}", candidates.join(", "), last_message)
+    } else {
+        format!("Ollama was not found on PATH and the local API is not responding. Checked {}. If Ollama is open, try endpoint http://localhost:11434 or restart Diligent Code Studio. {}", candidates.join(", "), last_message)
+    };
+
+    Ok(OllamaStatusInfo {
+        installed,
+        version,
+        running: false,
+        endpoint: preferred_endpoint,
+        model_count: 0,
+        models: Vec::new(),
+        message,
+    })
 }
 
 #[tauri::command]
@@ -2226,8 +2820,8 @@ fn ai_chat(
             Ok(AiChatResponse { provider: "OpenAI".to_string(), model: model_clean, response: output })
         }
         "ollama" => {
-            let base = endpoint.trim().trim_end_matches('/');
-            let url = if base.is_empty() { "http://127.0.0.1:11434/api/generate".to_string() } else { format!("{}/api/generate", base) };
+            let base = normalize_ollama_endpoint(&endpoint);
+            let url = format!("{}/api/generate", base);
             let body = serde_json::json!({
                 "model": model_clean,
                 "prompt": format!("{}\n\n{}", system_prompt, user_prompt),
@@ -2298,6 +2892,9 @@ fn main() {
             calculate_sha256,
             detect_project,
             check_development_tools,
+            check_setup_dependencies,
+            install_setup_dependency,
+            open_external_url,
             get_platform_info,
             search_workspace,
             git_init,
@@ -2313,6 +2910,8 @@ fn main() {
             run_diagnostics,
             get_project_templates,
             create_project_from_template,
+            list_ollama_models,
+            get_ollama_status,
             ai_chat
         ])
         .run(tauri::generate_context!())

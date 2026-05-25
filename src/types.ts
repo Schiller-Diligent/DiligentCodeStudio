@@ -54,6 +54,22 @@ export type ToolStatus = {
   hint: string;
 };
 
+
+export type SetupDependency = {
+  id: string;
+  name: string;
+  category: string;
+  description: string;
+  command: string;
+  available: boolean;
+  version: string;
+  required: boolean;
+  install_supported: boolean;
+  install_command: string;
+  website: string;
+  caution: string;
+};
+
 export type PlatformInfo = {
   os: string;
   family: string;
@@ -176,4 +192,22 @@ export type AiChatResponse = {
   provider: string;
   model: string;
   response: string;
+};
+
+export type OllamaModelInfo = {
+  name: string;
+  modified_at: string;
+  size: number;
+  digest: string;
+};
+
+
+export type OllamaStatusInfo = {
+  installed: boolean;
+  version: string;
+  running: boolean;
+  endpoint: string;
+  model_count: number;
+  models: OllamaModelInfo[];
+  message: string;
 };

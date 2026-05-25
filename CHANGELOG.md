@@ -1,6 +1,69 @@
+
+## v0.4.9 Workspace Menu No-Scroll Fix
+
+- Moved the Workspace Menu into its own dedicated top toolbar area.
+- Removed horizontal scrolling from the Workspace Menu.
+- Allowed Workspace Menu buttons to wrap naturally instead of creating a scrollbar.
+- Kept pointer-based drag-and-drop ordering active.
+- Kept Reset Menu Order in Settings only.
+- Preserved visible Workspace Menu labels at smaller widths.
+
 # Changelog
 
-## v0.4.1 - AI Code Actions
+## v0.4.9 - Build-Hardened Workspace Polish
+
+- Bumped app/package/Tauri/Cargo versions to 0.4.9.
+- Removed the Reset button from the top Workspace Menu; reset is now kept in Settings only.
+- Replaced the toolbar button HTML5 drag/drop behavior with pointer-based drag sorting so Workspace Menu buttons can be reliably dragged left or right in the desktop app WebView.
+- Added before/after drop indicators while dragging Workspace Menu buttons.
+- Kept Templates as the far-left default page.
+- Hardened GitHub Actions builds by using Node.js 22 LTS, npm ci, npm retry settings, and a Windows-only workflow.
+- Improved Ollama detection by checking both 127.0.0.1 and localhost and recognizing a running local API even when the CLI is not on PATH.
+- Preserved the Visual Studio C++ Build Tools winget "already installed / no upgrade available" handling as a successful installer result.
+
+## v0.4.8 - Drag-and-Drop Workspace Menu
+
+- Added drag-and-drop reordering directly on the top Workspace Menu.
+- Templates remains farthest left by default.
+- Removed the bulky Workspace Menu Order list from Settings.
+- Added a compact Workspace Menu settings card with a Reset Menu Order button.
+- Improved drag styling for active and dragged menu buttons.
+
+## v0.4.7 - Compact Workspace Menu Order
+
+- Made the Settings > Workspace Menu Order section smaller.
+- Changed Move Left / Move Right buttons to compact arrow controls.
+- Reduced menu-order row height, spacing, padding, and reset button size.
+- Improved fit in normal and compact interface modes.
+
+## v0.4.6
+
+- Improved Visual Studio C++ Build Tools detection on Windows.
+- Setup page now detects installed Build Tools even when `link.exe` is only available inside Developer PowerShell/Command Prompt.
+- Installer results now treat winget “already installed / no newer package available” messages as success instead of failure.
+
+## v0.4.5
+
+- Improved Ollama detection in the Dependency Setup Center.
+- Setup now treats Ollama as available if either the CLI is found on PATH or the local API is running at `http://127.0.0.1:11434`.
+- Clarified status text when the Ollama API is running but the CLI is not visible to the app process.
+
+## v0.4.4 - Dependency Setup Center
+
+- Added a dedicated Setup page for dependency checking and guided installs.
+- Added status cards for core development tools, optional build tools, AI tools, and packaging helpers.
+- Added installer buttons for supported Windows dependencies using winget.
+- Added Open Website buttons and a setup install log.
+- Added clearer required vs optional dependency grouping.
+
+## v0.4.3 - Editor AI Dock Default
+
+- AI Assistant dock now opens on the Editor page by default.
+- The top toolbar AI button now toggles Show AI / Hide AI behavior.
+- The dock remains visible even before a file is open, making AI setup and copy/paste easier.
+- Improved narrow-window AI dock layout so it stacks instead of disappearing.
+
+## v0.4.2a - AI Code Actions
 
 - Added targeted AI Code Action buttons.
 - Added Explain Selection, Review File, Fix Problems, Explain Terminal, Commit Message, Refactor Selection, Generate Comments, and Suggest Tests actions.
@@ -34,8 +97,6 @@
 - Added mode tabs for **Current File** and **Workspace** search.
 - Reduced top navigation clutter by removing one workspace page button.
 - Kept all existing Find / Replace and Search Across Files functionality.
-
-# Changelog
 
 ## 0.4.0 - AI Coding Assistant Foundation
 

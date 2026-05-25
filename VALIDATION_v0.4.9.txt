@@ -1,0 +1,24 @@
+Diligent Code Studio v0.4.9 validation
+
+Source package: DiligentCodeStudioStarter_v0.4.8(1).zip
+
+Commands completed successfully in this sandbox:
+- npm ci
+- npm run build
+
+Result:
+- React/TypeScript/Vite frontend build passed after the Workspace Menu drag-and-drop fix.
+- dist/ production frontend output is included.
+
+Not run here:
+- npm run tauri:build, because Rust/Cargo is not installed in this sandbox.
+
+Key v0.4.9 changes:
+- Version bumped to 0.4.9 across package.json, package-lock.json, tauri.conf.json, and Cargo.toml.
+- Top Workspace Menu Reset button removed; reset remains in Settings only.
+- Drag-and-drop Workspace Menu ordering fixed with pointer-based button sorting.
+- AI Assistant remains open by default on the Editor page.
+- GitHub Actions build hardened to Node.js 22.12.0 + npm ci + retry settings.
+- Added Windows-only GitHub Actions workflow.
+- Improved Ollama detection for localhost/127.0.0.1 and API-running-but-CLI-not-on-PATH cases.
+- Winget already-installed/no-upgrade messages are treated as installer success.

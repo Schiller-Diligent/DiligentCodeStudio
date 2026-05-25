@@ -1,0 +1,16 @@
+Diligent Code Studio v0.4.9 Workspace Menu No-Scroll Fix Validation
+
+Validated commands:
+- npm ci
+- npm run build
+
+Result:
+- TypeScript compile completed successfully.
+- Vite production build completed successfully.
+- dist/ was regenerated after the layout fix.
+
+Notes:
+- Workspace Menu has been moved into its own top toolbar area.
+- Horizontal scrolling has been removed from the Workspace Menu.
+- Buttons wrap naturally and remain draggable.
+- Reset Menu Order remains in Settings only.

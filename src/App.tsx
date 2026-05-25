@@ -34,9 +34,9 @@ import {
   Trash2,
   Wrench,
 } from 'lucide-react';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState, type MouseEvent as ReactMouseEvent, type PointerEvent as ReactPointerEvent } from 'react';
 import { languageFromPath, languageLabelFromId, languageLabelFromPath, registerDiligentLanguages, supportedLanguageGroups } from './editorLanguages';
-import type { ActivityItem, DiagnosticProblem, DiagnosticRunResult, GitChangedFile, GitStatusInfo, OpenFile, ProjectInfo, ReleaseInfo, ReleasePackageResult, ProjectTemplate, ProjectTemplateResult, SearchResult, TerminalResult, ToolRegistryItem, ToolStatus, PlatformInfo, WorkspaceEntry, AiChatResponse } from './types';
+import type { ActivityItem, DiagnosticProblem, DiagnosticRunResult, GitChangedFile, GitStatusInfo, OpenFile, ProjectInfo, ReleaseInfo, ReleasePackageResult, ProjectTemplate, ProjectTemplateResult, SearchResult, TerminalResult, ToolRegistryItem, ToolStatus, PlatformInfo, WorkspaceEntry, AiChatResponse, OllamaModelInfo, OllamaStatusInfo, SetupDependency } from './types';
 
 function nowStamp(): string {
   return new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
@@ -127,7 +127,8 @@ type QuickCommand = {
   className?: string;
 };
 
-type WorkspacePage = 'templates' | 'editor' | 'ai' | 'findsearch' | 'terminal' | 'git' | 'problems' | 'release' | 'registry' | 'project' | 'logs' | 'settings';
+type WorkspacePage = 'templates' | 'setup' | 'editor' | 'ai' | 'findsearch' | 'terminal' | 'git' | 'problems' | 'release' | 'registry' | 'project' | 'logs' | 'settings';
+type MenuDropPlacement = 'before' | 'after';
 
 type ThemePreference = 'dark' | 'midnight' | 'light';
 type TerminalShellPreference = 'auto' | 'powershell' | 'pwsh' | 'cmd' | 'bash' | 'zsh';
@@ -163,6 +164,7 @@ const PREFERENCES_STORAGE_KEY = 'diligent-code-studio.preferences.v1';
 
 const DEFAULT_PAGE_ORDER: WorkspacePage[] = [
   'templates',
+  'setup',
   'editor',
   'ai',
   'findsearch',
@@ -186,6 +188,7 @@ function workspacePageLabel(page: WorkspacePage): string {
     case 'problems': return 'Problems';
     case 'release': return 'Release';
     case 'templates': return 'Templates';
+    case 'setup': return 'Setup';
     case 'registry': return 'Registry';
     case 'project': return 'Tools';
     case 'logs': return 'Logs';
@@ -247,12 +250,12 @@ function clampNumber(value: unknown, fallback: number, min: number, max: number)
 function normalizeWorkspacePage(value: unknown): WorkspacePage {
   const page = String(value);
   if (page === 'find' || page === 'search' || page === 'findsearch') return 'findsearch';
-  if (['editor', 'ai', 'terminal', 'git', 'problems', 'release', 'templates', 'registry', 'project', 'logs', 'settings'].includes(page)) return page as WorkspacePage;
+  if (['editor', 'ai', 'terminal', 'git', 'problems', 'release', 'templates', 'setup', 'registry', 'project', 'logs', 'settings'].includes(page)) return page as WorkspacePage;
   return DEFAULT_PREFERENCES.lastActivePage;
 }
 
 function isWorkspacePage(value: unknown): value is WorkspacePage {
-  return ['editor', 'ai', 'findsearch', 'terminal', 'git', 'problems', 'release', 'templates', 'registry', 'project', 'logs', 'settings'].includes(String(value));
+  return ['editor', 'ai', 'findsearch', 'terminal', 'git', 'problems', 'release', 'templates', 'setup', 'registry', 'project', 'logs', 'settings'].includes(String(value));
 }
 
 function loadPreferences(): AppPreferences {
@@ -539,6 +542,19 @@ export default function App() {
   const diagnosticsOutputRef = useRef<HTMLPreElement | null>(null);
   const startupLoadedRef = useRef(false);
   const [preferences, setPreferences] = useState<AppPreferences>(() => loadPreferences());
+  const [draggedMenuPage, setDraggedMenuPage] = useState<WorkspacePage | null>(null);
+  const [dragOverMenuPage, setDragOverMenuPage] = useState<WorkspacePage | null>(null);
+  const [dragOverMenuDropSide, setDragOverMenuDropSide] = useState<MenuDropPlacement>('before');
+  const menuDragRef = useRef<{
+    page: WorkspacePage;
+    pointerId: number;
+    startX: number;
+    startY: number;
+    isDragging: boolean;
+    targetPage: WorkspacePage | null;
+    targetPlacement: MenuDropPlacement;
+  } | null>(null);
+  const suppressNextMenuClickRef = useRef(false);
   const [workspacePath, setWorkspacePath] = useState(() => workspaceFromPreferences(loadPreferences()));
   const [terminalCwd, setTerminalCwd] = useState(() => workspaceFromPreferences(loadPreferences()));
   const [entries, setEntries] = useState<WorkspaceEntry[]>([]);
@@ -551,11 +567,11 @@ export default function App() {
   const [toolStatuses, setToolStatuses] = useState<ToolStatus[]>([]);
   const [platformInfo, setPlatformInfo] = useState<PlatformInfo | null>(null);
   const [activity, setActivity] = useState<ActivityItem[]>([
-    { at: nowStamp(), level: 'info', message: 'Diligent Code Studio v0.4.1 loaded with AI Code Actions.' },
+    { at: nowStamp(), level: 'info', message: 'Diligent Code Studio v0.4.9 loaded with draggable workspace menu and build hardening.' },
   ]);
   const [terminalCommand, setTerminalCommand] = useState('git status');
   const [terminalOutput, setTerminalOutput] = useState(
-    'Diligent Terminal ready. Version 0.4.1 includes AI Code Actions.\n',
+    'Diligent Terminal ready. Version 0.4.9 includes drag-and-drop workspace menu ordering and hardened build settings.\n',
   );
   const [terminalRunning, setTerminalRunning] = useState(false);
   const [terminalCollapsed, setTerminalCollapsed] = useState(false);
@@ -602,6 +618,15 @@ export default function App() {
   const [aiResponse, setAiResponse] = useState('AI Assistant ready. Configure OpenAI or Ollama in Settings, then ask about selected code, the current file, diagnostics, terminal output, or Git status.\n');
   const [aiContextMode, setAiContextMode] = useState<AiContextPreference>(() => loadPreferences().aiDefaultContext);
   const [aiBusy, setAiBusy] = useState(false);
+  const [aiDockOpen, setAiDockOpen] = useState(true);
+  const [ollamaModels, setOllamaModels] = useState<OllamaModelInfo[]>([]);
+  const [ollamaModelsLoading, setOllamaModelsLoading] = useState(false);
+  const [ollamaModelsError, setOllamaModelsError] = useState('');
+  const [ollamaStatus, setOllamaStatus] = useState<OllamaStatusInfo | null>(null);
+  const [setupDependencies, setSetupDependencies] = useState<SetupDependency[]>([]);
+  const [setupLoading, setSetupLoading] = useState(false);
+  const [setupInstallBusyId, setSetupInstallBusyId] = useState('');
+  const [setupOutput, setSetupOutput] = useState('Dependency Setup Center ready. Use Check Again to refresh installed tools. Installer buttons ask for confirmation first.\n');
 
 
   const activeFile = useMemo(
@@ -648,6 +673,27 @@ export default function App() {
     const enabled = toolRegistryItems.filter((item) => item.enabled).length;
     return { builtIn, custom, enabled, total: toolRegistryItems.length };
   }, [toolRegistryItems]);
+
+  const setupCategories = useMemo(() => {
+    const categories: Record<string, SetupDependency[]> = {};
+    for (const item of setupDependencies) {
+      const category = item.category || 'Other';
+      if (!categories[category]) categories[category] = [];
+      categories[category].push(item);
+    }
+    return Object.entries(categories);
+  }, [setupDependencies]);
+
+  const setupStats = useMemo(() => {
+    const required = setupDependencies.filter((item) => item.required);
+    const optional = setupDependencies.filter((item) => !item.required);
+    return {
+      total: setupDependencies.length,
+      installed: setupDependencies.filter((item) => item.available).length,
+      missingRequired: required.filter((item) => !item.available).length,
+      optionalMissing: optional.filter((item) => !item.available).length,
+    };
+  }, [setupDependencies]);
 
   const npmCommand = platformInfo?.npm_command || 'npm';
   const isWindowsPlatform = !platformInfo || platformInfo.os === 'windows';
@@ -718,6 +764,7 @@ export default function App() {
       case 'problems': return 'Problems / Diagnostics';
       case 'release': return 'Release Builder';
       case 'templates': return 'Project Templates';
+      case 'setup': return 'Dependency Setup Center';
       case 'registry': return 'Extension / Tools Registry';
       case 'project': return 'Project / Tools';
       case 'logs': return 'Activity Logs';
@@ -785,6 +832,14 @@ export default function App() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activePage, workspacePath]);
+
+  useEffect(() => {
+    if (preferences.aiProvider !== 'ollama') return;
+    if (activePage !== 'settings' && activePage !== 'ai' && activePage !== 'editor') return;
+    if (ollamaModels.length > 0 || ollamaModelsLoading || ollamaModelsError) return;
+    void refreshOllamaModels();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [preferences.aiProvider, preferences.aiOllamaEndpoint, activePage]);
 
   useEffect(() => {
     if (!preferences.autoSave || !activeFile?.dirty) return;
@@ -890,25 +945,129 @@ export default function App() {
     if (page === 'templates') {
       void refreshTemplates();
     }
+
+    if (page === 'setup') {
+      void refreshSetupDependencies();
+    }
   }
 
-  function moveMenuPage(page: WorkspacePage, direction: 'left' | 'right') {
+  function reorderMenuPage(draggedPage: WorkspacePage, targetPage: WorkspacePage, placement: MenuDropPlacement = 'before') {
+    if (draggedPage === targetPage) return;
+
+    let changed = false;
     setPreferences((current) => {
       const order = normalizePageOrder(current.menuPageOrder);
-      const index = order.indexOf(page);
-      if (index < 0) return current;
+      if (!order.includes(draggedPage) || !order.includes(targetPage)) return current;
 
-      const nextIndex = direction === 'left' ? index - 1 : index + 1;
-      if (nextIndex < 0 || nextIndex >= order.length) return current;
+      const next = order.filter((page) => page !== draggedPage);
+      const targetIndex = next.indexOf(targetPage);
+      if (targetIndex < 0) return current;
 
-      const next = [...order];
-      [next[index], next[nextIndex]] = [next[nextIndex], next[index]];
+      const insertIndex = placement === 'after' ? targetIndex + 1 : targetIndex;
+      next.splice(insertIndex, 0, draggedPage);
+
+      if (next.join('|') === order.join('|')) return current;
+      changed = true;
       return { ...current, menuPageOrder: next };
     });
+
+    if (changed) {
+      log('info', `Workspace menu moved: ${workspacePageLabel(draggedPage)} ${placement} ${workspacePageLabel(targetPage)}.`);
+    }
+  }
+
+  function clearMenuDragState() {
+    menuDragRef.current = null;
+    setDraggedMenuPage(null);
+    setDragOverMenuPage(null);
+    setDragOverMenuDropSide('before');
+  }
+
+  function updateMenuDragTarget(clientX: number, clientY: number) {
+    const drag = menuDragRef.current;
+    if (!drag) return;
+
+    const element = document.elementFromPoint(clientX, clientY)?.closest('[data-workspace-page]');
+    if (!element) return;
+
+    const targetPage = element.getAttribute('data-workspace-page');
+    if (!isWorkspacePage(targetPage)) return;
+
+    const rect = element.getBoundingClientRect();
+    const placement: MenuDropPlacement = clientX > rect.left + rect.width / 2 ? 'after' : 'before';
+    drag.targetPage = targetPage;
+    drag.targetPlacement = placement;
+    setDragOverMenuPage(targetPage);
+    setDragOverMenuDropSide(placement);
+  }
+
+  function handleMenuPointerDown(page: WorkspacePage, event: ReactPointerEvent<HTMLButtonElement>) {
+    if (event.button !== 0) return;
+
+    menuDragRef.current = {
+      page,
+      pointerId: event.pointerId,
+      startX: event.clientX,
+      startY: event.clientY,
+      isDragging: false,
+      targetPage: page,
+      targetPlacement: 'before',
+    };
+    event.currentTarget.setPointerCapture?.(event.pointerId);
+  }
+
+  function handleMenuPointerMove(event: ReactPointerEvent<HTMLButtonElement>) {
+    const drag = menuDragRef.current;
+    if (!drag || drag.pointerId !== event.pointerId) return;
+
+    const distance = Math.hypot(event.clientX - drag.startX, event.clientY - drag.startY);
+    if (!drag.isDragging && distance >= 6) {
+      drag.isDragging = true;
+      suppressNextMenuClickRef.current = true;
+      setDraggedMenuPage(drag.page);
+    }
+
+    if (!drag.isDragging) return;
+
+    event.preventDefault();
+    updateMenuDragTarget(event.clientX, event.clientY);
+  }
+
+  function handleMenuPointerUp(event: ReactPointerEvent<HTMLButtonElement>) {
+    const drag = menuDragRef.current;
+    if (!drag || drag.pointerId !== event.pointerId) return;
+
+    if (drag.isDragging && drag.targetPage) {
+      event.preventDefault();
+      suppressNextMenuClickRef.current = true;
+      reorderMenuPage(drag.page, drag.targetPage, drag.targetPlacement);
+    }
+
+    event.currentTarget.releasePointerCapture?.(event.pointerId);
+    clearMenuDragState();
+  }
+
+  function handleMenuPointerCancel(event: ReactPointerEvent<HTMLButtonElement>) {
+    const drag = menuDragRef.current;
+    if (drag?.pointerId === event.pointerId) {
+      event.currentTarget.releasePointerCapture?.(event.pointerId);
+      clearMenuDragState();
+    }
+  }
+
+  function handleWorkspaceMenuClick(page: WorkspacePage, event: ReactMouseEvent<HTMLButtonElement>) {
+    if (suppressNextMenuClickRef.current) {
+      suppressNextMenuClickRef.current = false;
+      event.preventDefault();
+      event.stopPropagation();
+      return;
+    }
+
+    activateWorkspacePage(page);
   }
 
   function resetMenuPageOrder() {
-    setPreferences((current) => ({ ...current, menuPageOrder: DEFAULT_PAGE_ORDER }));
+    setPreferences((current) => ({ ...current, menuPageOrder: [...DEFAULT_PAGE_ORDER] }));
     log('info', 'Workspace menu button order reset to defaults.');
   }
 
@@ -922,6 +1081,7 @@ export default function App() {
       case 'problems': return <AlertTriangle size={14} />;
       case 'release': return <PackageCheck size={14} />;
       case 'templates': return <LayoutTemplate size={14} />;
+      case 'setup': return <PackageCheck size={14} />;
       case 'registry': return <Wrench size={14} />;
       case 'project': return <PackageCheck size={14} />;
       case 'logs': return <AlertTriangle size={14} />;
@@ -1043,6 +1203,68 @@ export default function App() {
       }
     } catch (error) {
       log('error', `Tool check failed: ${String(error)}`);
+    }
+  }
+
+  async function refreshSetupDependencies() {
+    setSetupLoading(true);
+    try {
+      const result = await invoke<SetupDependency[]>('check_setup_dependencies');
+      setSetupDependencies(result);
+      const missingRequired = result.filter((item) => item.required && !item.available).map((item) => item.name);
+      if (missingRequired.length > 0) {
+        log('warn', `Setup check found missing required dependencies: ${missingRequired.join(', ')}.`);
+      } else {
+        log('success', 'Setup dependency check completed. Required dependencies are installed.');
+      }
+    } catch (error) {
+      log('error', `Dependency setup check failed: ${String(error)}`);
+      setSetupOutput((current) => `${current}[${nowStamp()}] Dependency setup check failed: ${String(error)}\n`);
+    } finally {
+      setSetupLoading(false);
+    }
+  }
+
+  async function installSetupDependency(item: SetupDependency) {
+    if (!item.install_supported) {
+      log('warn', `${item.name} does not have an automatic installer for this platform.`);
+      return;
+    }
+
+    const confirmed = window.confirm(
+      `Install ${item.name}?\n\nThis will run:\n${item.install_command}\n\n${item.caution || 'The installer may open a separate setup window.'}`,
+    );
+    if (!confirmed) {
+      log('warn', `Install cancelled for ${item.name}.`);
+      return;
+    }
+
+    setSetupInstallBusyId(item.id);
+    setSetupOutput((current) => `${current}\n[${nowStamp()}] Installing ${item.name}...\nCommand: ${item.install_command}\n`);
+    try {
+      const result = await invoke<TerminalResult>('install_setup_dependency', { dependencyId: item.id });
+      setSetupOutput((current) => `${current}${formatTerminalResult(result)}\n`);
+      if (result.success) {
+        log('success', `${item.name} installer completed. Restart Diligent Code Studio if PATH changed.`);
+      } else {
+        log('warn', `${item.name} installer exited with code ${result.exit_code}. Review Setup output.`);
+      }
+      await refreshSetupDependencies();
+    } catch (error) {
+      setSetupOutput((current) => `${current}[${nowStamp()}] Install failed for ${item.name}: ${String(error)}\n`);
+      log('error', `Install failed for ${item.name}: ${String(error)}`);
+    } finally {
+      setSetupInstallBusyId('');
+    }
+  }
+
+  async function openSetupDependencyWebsite(item: SetupDependency) {
+    if (!item.website) return;
+    try {
+      await invoke('open_external_url', { url: item.website });
+      log('info', `Opened ${item.name} website.`);
+    } catch (error) {
+      log('error', `Could not open ${item.name} website: ${String(error)}`);
     }
   }
 
@@ -1778,6 +2000,44 @@ ERROR: ${message}
     return `/*\n${cleaned}\n*/`;
   }
 
+  async function refreshOllamaModels() {
+    setOllamaModelsLoading(true);
+    setOllamaModelsError('');
+    try {
+      const status = await invoke<OllamaStatusInfo>('get_ollama_status', { endpoint: preferences.aiOllamaEndpoint });
+      setOllamaStatus(status);
+      setOllamaModels(status.models);
+
+      if (status.models.length > 0 && !status.models.some((model) => model.name === preferences.aiOllamaModel)) {
+        updatePreference('aiOllamaModel', status.models[0].name);
+      }
+
+      if (status.running && status.models.length > 0) {
+        log('success', `Ollama is running. Loaded ${status.models.length} local model(s).`);
+      } else if (status.running) {
+        const message = 'Ollama is running, but no local models were found. Run: ollama pull llama3.2';
+        setOllamaModelsError(message);
+        log('warn', message);
+      } else if (status.installed) {
+        const message = 'Ollama appears to be installed, but the local service is not responding. Start Ollama, then click Refresh Models.';
+        setOllamaModelsError(message);
+        log('warn', message);
+      } else {
+        const message = 'Ollama was not found on PATH and the local API is not responding. Install/start Ollama, then click Refresh Models.';
+        setOllamaModelsError(message);
+        log('warn', message);
+      }
+    } catch (error) {
+      const message = String(error);
+      setOllamaModelsError(message);
+      setOllamaModels([]);
+      setOllamaStatus(null);
+      log('warn', `Ollama model refresh failed: ${message}`);
+    } finally {
+      setOllamaModelsLoading(false);
+    }
+  }
+
   function insertAiResponseAsComment() {
     if (!activeFile || !aiResponse.trim()) return;
     const comment = aiCommentText(aiResponse, activeFile.language);
@@ -2408,36 +2668,62 @@ ERROR: ${String(error)}
       </aside>
 
       <section className="main-area page-mode">
-        <header className="topbar">
-          <div className="page-title-block">
-            <h2>{activePageTitle}</h2>
-          </div>
-          <div className="toolbar">
-            <nav className="top-page-nav" aria-label="Workspace pages">
-              {normalizePageOrder(preferences.menuPageOrder).map((page) => (
+        <header className="topbar workspace-menu-shell">
+          <nav className="top-page-nav draggable-top-page-nav" aria-label="Workspace pages. Drag buttons to reorder.">
+            {normalizePageOrder(preferences.menuPageOrder).map((page) => {
+              const dropClass = dragOverMenuPage === page ? `drag-over drag-over-${dragOverMenuDropSide}` : '';
+              return (
                 <button
                   key={page}
-                  className={activePage === page ? 'active' : ''}
-                  onClick={() => activateWorkspacePage(page)}
-                  title={`${workspacePageLabel(page)} page`}
+                  data-workspace-page={page}
+                  draggable={false}
+                  className={`${activePage === page ? 'active' : ''} ${draggedMenuPage === page ? 'dragging' : ''} ${dropClass}`}
+                  onClick={(event) => handleWorkspaceMenuClick(page, event)}
+                  onPointerDown={(event) => handleMenuPointerDown(page, event)}
+                  onPointerMove={handleMenuPointerMove}
+                  onPointerUp={handleMenuPointerUp}
+                  onPointerCancel={handleMenuPointerCancel}
+                  title={`Drag left or right to reorder. Click to open ${workspacePageLabel(page)}.`}
                 >
-                  {workspacePageIcon(page)} {workspacePageLabel(page)}
+                  {workspacePageIcon(page)} <span>{workspacePageLabel(page)}</span>
                 </button>
-              ))}
-            </nav>
-            {unsavedFileCount > 0 && <span className="unsaved-pill">{unsavedFileCount} unsaved</span>}
-            <button className="toolbar-action" onClick={saveActiveFile} disabled={!activeFile} title="Save active file">
-              <Save size={14} /> <span>Save</span>
-            </button>
-            <button className="toolbar-action" onClick={saveActiveFileAs} disabled={!activeFile} title="Save active file as...">
-              <SaveAll size={14} /> <span>Save As</span>
-            </button>
-            <button className="toolbar-action" onClick={formatActiveDocument} disabled={!activeFile} title="Format active document">
-              <Wrench size={14} /> <span>Format</span>
-            </button>
-            <button className="toolbar-action" onClick={hashActiveFile} disabled={!activeFile} title="Generate SHA-256 for active file">
-              <Hash size={14} /> <span>SHA</span>
-            </button>
+              );
+            })}
+          </nav>
+
+          <div className="workspace-command-row">
+            <div className="page-title-block">
+              <h2>{activePageTitle}</h2>
+            </div>
+            <div className="toolbar">
+              {unsavedFileCount > 0 && <span className="unsaved-pill">{unsavedFileCount} unsaved</span>}
+              <button className="toolbar-action" onClick={saveActiveFile} disabled={!activeFile} title="Save active file">
+                <Save size={14} /> <span>Save</span>
+              </button>
+              <button className="toolbar-action" onClick={saveActiveFileAs} disabled={!activeFile} title="Save active file as...">
+                <SaveAll size={14} /> <span>Save As</span>
+              </button>
+              <button className="toolbar-action" onClick={formatActiveDocument} disabled={!activeFile} title="Format active document">
+                <Wrench size={14} /> <span>Format</span>
+              </button>
+              <button className="toolbar-action" onClick={hashActiveFile} disabled={!activeFile} title="Generate SHA-256 for active file">
+                <Hash size={14} /> <span>SHA</span>
+              </button>
+              <button
+                className={`toolbar-action ${aiDockOpen ? 'active-toolbar-action' : ''}`}
+                onClick={() => {
+                  if (activePage !== 'editor') {
+                    setActivePage('editor');
+                    setAiDockOpen(true);
+                  } else {
+                    setAiDockOpen((current) => !current);
+                  }
+                }}
+                title="Show or hide the docked AI assistant on the Editor page"
+              >
+                <Bot size={14} /> <span>{aiDockOpen && activePage === 'editor' ? 'Hide AI' : 'Show AI'}</span>
+              </button>
+            </div>
           </div>
         </header>
 
@@ -2460,53 +2746,102 @@ ERROR: ${String(error)}
             </nav>
 
             <section className="editor-wrap">
-              {activeFile ? (
-                <Editor
-                  height="100%"
-                  language={activeFile.language}
-                  value={activeFile.content}
-                  theme={preferences.theme === 'light' ? 'vs' : 'vs-dark'}
-                  onChange={updateActiveContent}
-                  beforeMount={handleEditorBeforeMount}
-                  onMount={handleEditorMount}
-                  options={{
-                    minimap: { enabled: true },
-                    lineNumbers: 'on',
-                    glyphMargin: true,
-                    renderLineHighlight: 'all',
-                    fontSize: preferences.editorFontSize,
-                    fontFamily: 'Cascadia Code, Consolas, monospace',
-                    wordWrap: preferences.wordWrap ? 'on' : 'off',
-                    automaticLayout: true,
-                    scrollBeyondLastLine: false,
-                  }}
-                />
-              ) : (
-                <div className="welcome-card editor-welcome-card">
-                  <ShieldCheck size={48} />
-                  <h2>Open a file to start editing.</h2>
-                  <p>Version 0.4.1 adds AI Code Actions for practical coding help.</p>
-                  <div className="recent-files-card">
-                    <div className="recent-files-header">
-                      <strong>Recent Files</strong>
-                      {recentFiles.length > 0 && <button className="link-button" onClick={clearRecentFiles}>Clear</button>}
-                    </div>
-                    {recentFiles.length === 0 ? (
-                      <p className="muted-note">No recent files yet. Open a file from the explorer to populate this list.</p>
-                    ) : (
-                      <div className="recent-files-list">
-                        {recentFiles.map((file) => (
-                          <button key={file.path} onClick={() => openFileByPath(file.path)} title={file.path}>
-                            <FileCode2 size={14} />
-                            <span>{file.name}</span>
-                            <code>{formatLanguageLabel(file.language)}</code>
-                          </button>
-                        ))}
+              <div className={`editor-ai-layout ${aiDockOpen ? 'dock-open' : 'dock-closed'} ${activeFile ? 'has-active-file' : 'no-active-file'}`}>
+                <div className="editor-canvas">
+                  {activeFile ? (
+                    <Editor
+                      height="100%"
+                      language={activeFile.language}
+                      value={activeFile.content}
+                      theme={preferences.theme === 'light' ? 'vs' : 'vs-dark'}
+                      onChange={updateActiveContent}
+                      beforeMount={handleEditorBeforeMount}
+                      onMount={handleEditorMount}
+                      options={{
+                        minimap: { enabled: true },
+                        lineNumbers: 'on',
+                        glyphMargin: true,
+                        renderLineHighlight: 'all',
+                        fontSize: preferences.editorFontSize,
+                        fontFamily: 'Cascadia Code, Consolas, monospace',
+                        wordWrap: preferences.wordWrap ? 'on' : 'off',
+                        automaticLayout: true,
+                        scrollBeyondLastLine: false,
+                      }}
+                    />
+                  ) : (
+                    <div className="welcome-card editor-welcome-card">
+                      <ShieldCheck size={48} />
+                      <h2>Open a file to start editing.</h2>
+                      <p>Version 0.4.9 keeps the AI Assistant visible by default and uses pointer-based toolbar sorting so you can drag Workspace Menu buttons into your preferred order.</p>
+                      <div className="recent-files-card">
+                        <div className="recent-files-header">
+                          <strong>Recent Files</strong>
+                          {recentFiles.length > 0 && <button className="link-button" onClick={clearRecentFiles}>Clear</button>}
+                        </div>
+                        {recentFiles.length === 0 ? (
+                          <p className="muted-note">No recent files yet. Open a file from the explorer to populate this list.</p>
+                        ) : (
+                          <div className="recent-files-list">
+                            {recentFiles.map((file) => (
+                              <button key={file.path} onClick={() => openFileByPath(file.path)} title={file.path}>
+                                <FileCode2 size={14} />
+                                <span>{file.name}</span>
+                                <code>{formatLanguageLabel(file.language)}</code>
+                              </button>
+                            ))}
+                          </div>
+                        )}
                       </div>
-                    )}
-                  </div>
+                    </div>
+                  )}
                 </div>
-              )}
+
+                {aiDockOpen && (
+                  <aside className="editor-ai-dock">
+                    <div className="editor-ai-dock-header">
+                      <div>
+                        <div className="panel-title"><Bot size={15} /> AI Assistant</div>
+                        <p className="muted-note">Open by default on the Editor page for easier copy/paste. Use AI Panel to hide it.</p>
+                      </div>
+                      <button className="icon-only-button" onClick={() => setAiDockOpen(false)} title="Hide AI panel">×</button>
+                    </div>
+
+                    <label className="setting-row compact-setting-row">
+                      <span>Context</span>
+                      <select value={aiContextMode} onChange={(event) => setAiContextMode(event.target.value as AiContextPreference)}>
+                        <option value="selection">Selection / file</option>
+                        <option value="currentFile">Current file</option>
+                        <option value="problems">Problems</option>
+                        <option value="terminal">Terminal</option>
+                        <option value="git">Git</option>
+                      </select>
+                    </label>
+
+                    <textarea
+                      className="editor-ai-prompt"
+                      value={aiPrompt}
+                      onChange={(event) => setAiPrompt(event.target.value)}
+                      placeholder="Ask AI about this file, selected code, diagnostics, terminal output, or Git status..."
+                    />
+
+                    <div className="editor-ai-dock-actions">
+                      <button onClick={askAi} disabled={aiBusy || preferences.aiProvider === 'disabled'}><Send size={13} /> {aiBusy ? 'Working...' : 'Ask'}</button>
+                      <button type="button" onClick={() => prepareAiCodeAction('explain-selection')} disabled={aiBusy || !activeFile}>Explain</button>
+                      <button type="button" onClick={() => prepareAiCodeAction('review-current-file')} disabled={aiBusy || !activeFile}>Review</button>
+                    </div>
+
+                    <pre className="editor-ai-response-output">{aiResponse}</pre>
+
+                    <div className="editor-ai-dock-actions">
+                      <button onClick={() => navigator.clipboard.writeText(aiResponse)} disabled={!aiResponse.trim()}><Copy size={13} /> Copy</button>
+                      <button onClick={insertAiResponseIntoEditor} disabled={!activeFile || !aiResponse.trim()}><Edit3 size={13} /> Insert</button>
+                      <button onClick={insertAiResponseAsComment} disabled={!activeFile || !aiResponse.trim()}>Comment</button>
+                      <button onClick={() => setActivePage('ai')}><ExternalLink size={13} /> Full AI</button>
+                    </div>
+                  </aside>
+                )}
+              </div>
             </section>
 
             <div className="editor-footer-strip enhanced-status-strip">
@@ -3238,6 +3573,83 @@ ERROR: ${String(error)}
           </section>
         )}
 
+        {activePage === 'setup' && (
+          <section className="page-content utility-page setup-page">
+            <div className="setup-layout">
+              <section className="panel setup-summary-panel">
+                <div className="git-page-header">
+                  <div>
+                    <div className="panel-title"><PackageCheck size={16} /> Dependency Setup Center</div>
+                    <p className="muted-note">Check and install the developer tools Diligent Code Studio uses for editing, building, packaging, Git, and optional local AI.</p>
+                  </div>
+                  <button className="secondary-button" onClick={refreshSetupDependencies} disabled={setupLoading}>
+                    <RefreshCw size={14} /> {setupLoading ? 'Checking...' : 'Check Again'}
+                  </button>
+                </div>
+                <div className="setup-stat-grid">
+                  <span><strong>{setupStats.total}</strong> dependencies</span>
+                  <span><strong>{setupStats.installed}</strong> installed</span>
+                  <span className={setupStats.missingRequired === 0 ? 'ok' : 'missing'}><strong>{setupStats.missingRequired}</strong> required missing</span>
+                  <span><strong>{setupStats.optionalMissing}</strong> optional missing</span>
+                </div>
+                <p className="muted-note">Install buttons run platform-specific commands, such as <code>winget install</code> on Windows. The app asks for confirmation first and logs the output below.</p>
+              </section>
+
+              <section className="panel setup-log-panel">
+                <div className="panel-title"><TerminalSquare size={16} /> Setup Install Log</div>
+                <div className="setup-log-actions">
+                  <button className="secondary-button" onClick={() => setSetupOutput('Dependency Setup Center ready.\n')}><Trash2 size={14} /> Clear</button>
+                  <button className="secondary-button" onClick={() => navigator.clipboard.writeText(setupOutput)}><Copy size={14} /> Copy Log</button>
+                </div>
+                <pre className="terminal-output setup-output">{setupOutput}</pre>
+              </section>
+
+              <section className="panel setup-list-panel">
+                <div className="panel-title"><Wrench size={16} /> Dependencies</div>
+                {setupDependencies.length === 0 ? (
+                  <p className="muted-note">No dependency data loaded yet. Click Check Again.</p>
+                ) : (
+                  <div className="setup-category-stack">
+                    {setupCategories.map(([category, items]) => (
+                      <div key={category} className="setup-category">
+                        <h3>{category}</h3>
+                        <div className="setup-card-grid">
+                          {items.map((item) => (
+                            <article key={item.id} className={`setup-card ${item.available ? 'installed' : item.required ? 'required-missing' : 'optional-missing'}`}>
+                              <div className="setup-card-header">
+                                <div>
+                                  <strong>{item.name}</strong>
+                                  <span>{item.required ? 'Required' : 'Optional'} • {item.command || 'No command check'}</span>
+                                </div>
+                                <span className={`setup-status-pill ${item.available ? 'ok' : 'missing'}`}>
+                                  {item.available ? <CheckCircle2 size={13} /> : <AlertTriangle size={13} />}
+                                  {item.available ? 'Installed' : 'Missing'}
+                                </span>
+                              </div>
+                              <p>{item.description}</p>
+                              <code>{item.available ? item.version : item.install_command || item.website || item.caution}</code>
+                              {item.caution && <p className="setup-caution">{item.caution}</p>}
+                              <div className="setup-card-actions">
+                                <button className="secondary-button" onClick={() => openSetupDependencyWebsite(item)} disabled={!item.website}>
+                                  <ExternalLink size={14} /> Website
+                                </button>
+                                <button onClick={() => installSetupDependency(item)} disabled={!item.install_supported || setupInstallBusyId === item.id}>
+                                  <Play size={14} /> {setupInstallBusyId === item.id ? 'Installing...' : 'Install'}
+                                </button>
+                              </div>
+                            </article>
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </section>
+            </div>
+          </section>
+        )}
+
+
         {activePage === 'project' && (
           <section className="page-content utility-page project-page">
             <div className="project-grid">
@@ -3376,21 +3788,11 @@ ERROR: ${String(error)}
                 </label>
               </section>
 
-              <section className="panel settings-panel wide-settings-panel">
-                <div className="panel-title"><LayoutTemplate size={16} /> Workspace Menu Order</div>
-                <p className="muted-note">Arrange the top workspace buttons. The first item appears farthest left in the main toolbar.</p>
-                <div className="menu-order-list">
-                  {normalizePageOrder(preferences.menuPageOrder).map((page, index) => (
-                    <div key={page} className="menu-order-row">
-                      <span className="menu-order-position">{index + 1}</span>
-                      <span className="menu-order-label">{workspacePageIcon(page)} {workspacePageLabel(page)}</span>
-                      <button onClick={() => moveMenuPage(page, 'left')} disabled={index === 0}>Move Left</button>
-                      <button onClick={() => moveMenuPage(page, 'right')} disabled={index === normalizePageOrder(preferences.menuPageOrder).length - 1}>Move Right</button>
-                    </div>
-                  ))}
-                </div>
-                <div className="settings-actions">
-                  <button onClick={resetMenuPageOrder}><RefreshCw size={14} /> Reset Menu Order</button>
+              <section className="panel settings-panel compact-settings-panel">
+                <div className="panel-title"><LayoutTemplate size={16} /> Workspace Menu</div>
+                <p className="muted-note compact-note">Drag the top workspace menu buttons directly to rearrange them. Templates starts on the far left by default.</p>
+                <div className="settings-actions compact-settings-actions">
+                  <button className="small-action-button" onClick={resetMenuPageOrder}><RefreshCw size={13} /> Reset Menu Order</button>
                 </div>
               </section>
 
@@ -3471,10 +3873,44 @@ ERROR: ${String(error)}
                   <span>Ollama endpoint</span>
                   <input value={preferences.aiOllamaEndpoint} onChange={(event) => updatePreference('aiOllamaEndpoint', event.target.value)} spellCheck={false} />
                 </label>
-                <label className="setting-row">
+                <div className="setting-row setting-row-wide">
+                  <span>Ollama status</span>
+                  <div className="ollama-status-box">
+                    <strong>{ollamaStatus ? (ollamaStatus.running ? 'Running' : ollamaStatus.installed ? 'Installed, not responding' : 'Not detected') : 'Not checked yet'}</strong>
+                    <small>{ollamaStatus?.message ?? 'Click Refresh Models to check whether Ollama is installed, running, and has local models available.'}</small>
+                    {ollamaStatus?.version && <code>{ollamaStatus.version}</code>}
+                  </div>
+                </div>
+                <div className="setting-row setting-row-wide ollama-model-row">
                   <span>Ollama model</span>
-                  <input value={preferences.aiOllamaModel} onChange={(event) => updatePreference('aiOllamaModel', event.target.value)} spellCheck={false} />
-                </label>
+                  <div className="ollama-model-controls">
+                    <select
+                      value={preferences.aiOllamaModel}
+                      onChange={(event) => updatePreference('aiOllamaModel', event.target.value)}
+                      disabled={ollamaModelsLoading}
+                    >
+                      {ollamaModels.length === 0 ? (
+                        <option value={preferences.aiOllamaModel}>{preferences.aiOllamaModel || 'No local models found'}</option>
+                      ) : (
+                        ollamaModels.map((model) => (
+                          <option key={model.name} value={model.name}>{model.name}</option>
+                        ))
+                      )}
+                    </select>
+                    <button type="button" onClick={refreshOllamaModels} disabled={ollamaModelsLoading}>
+                      <RefreshCw size={14} /> {ollamaModelsLoading ? 'Checking...' : 'Refresh Models'}
+                    </button>
+                  </div>
+                  <input
+                    className="manual-model-input"
+                    value={preferences.aiOllamaModel}
+                    onChange={(event) => updatePreference('aiOllamaModel', event.target.value)}
+                    placeholder="Manual model name, e.g. llama3.2 or codellama"
+                    spellCheck={false}
+                  />
+                  {ollamaModelsError && <p className="setting-help warning-help">{ollamaModelsError}</p>}
+                  {!ollamaModelsError && ollamaModels.length > 0 && <p className="setting-help">Detected {ollamaModels.length} local Ollama model(s).</p>}
+                </div>
                 <label className="setting-row">
                   <span>Default AI context</span>
                   <select value={preferences.aiDefaultContext} onChange={(event) => updatePreference('aiDefaultContext', event.target.value as AiContextPreference)}>

@@ -1,40 +1,19 @@
-name: Build Diligent Code Studio Cross-Platform
+name: Build Diligent Code Studio Windows
 
 on:
   workflow_dispatch:
   push:
     branches: [ main ]
     tags: [ 'v*' ]
-  pull_request:
-    branches: [ main ]
 
 jobs:
-  build:
-    name: Build ${{ matrix.name }}
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - name: Windows
-            platform: windows-latest
-            artifact_name: diligent-code-studio-windows
-          - name: macOS
-            platform: macos-latest
-            artifact_name: diligent-code-studio-macos
-          - name: Linux
-            platform: ubuntu-22.04
-            artifact_name: diligent-code-studio-linux
-    runs-on: ${{ matrix.platform }}
+  build-windows:
+    name: Build Windows Installer
+    runs-on: windows-latest
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-
-      - name: Install Linux dependencies
-        if: matrix.platform == 'ubuntu-22.04'
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y             libwebkit2gtk-4.1-dev             build-essential             curl             wget             file             libxdo-dev             libssl-dev             libayatana-appindicator3-dev             librsvg2-dev
 
       - name: Setup Node.js LTS
         uses: actions/setup-node@v4
@@ -42,10 +21,13 @@ jobs:
           node-version: '22.12.0'
           cache: npm
 
-      - name: Setup Rust
+      - name: Setup Rust stable MSVC
         uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: x86_64-pc-windows-msvc
 
       - name: Show tool versions
+        shell: pwsh
         run: |
           node --version
           npm --version
@@ -53,6 +35,7 @@ jobs:
           cargo --version
 
       - name: Configure npm retries
+        shell: pwsh
         run: |
           npm config set registry https://registry.npmjs.org/
           npm config set fetch-retries 5
@@ -72,10 +55,10 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Upload platform bundle artifacts
+      - name: Upload Windows bundle artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ matrix.artifact_name }}
+          name: diligent-code-studio-windows
           path: |
             src-tauri/target/release/bundle/**
           if-no-files-found: warn
