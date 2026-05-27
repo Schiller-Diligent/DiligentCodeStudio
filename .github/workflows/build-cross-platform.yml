@@ -2,9 +2,6 @@ name: Build Diligent Code Studio Cross-Platform
 
 on:
   workflow_dispatch:
-  push:
-    tags:
-      - "v*.*.*"
 
 jobs:
   build:
@@ -24,10 +21,10 @@ jobs:
         working-directory: ${{ github.workspace }}
 
     steps:
-      - name: Checkout repository
+      - name: Checkout repository main
         uses: actions/checkout@v4
         with:
-          ref: ${{ github.ref }}
+          ref: main
           fetch-depth: 0
 
       - name: Verify checkout version
