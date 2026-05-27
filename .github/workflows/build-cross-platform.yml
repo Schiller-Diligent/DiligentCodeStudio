@@ -25,6 +25,24 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          ref: ${{ github.ref }}
+          fetch-depth: 0
+
+      - name: Show checkout and version diagnostics
+        shell: bash
+        run: |
+          echo "GITHUB_REF=$GITHUB_REF"
+          echo "GITHUB_SHA=$GITHUB_SHA"
+          echo "PWD=$(pwd)"
+          git branch --show-current || true
+          git rev-parse HEAD
+          echo "Root package version:"
+          node -p "require('./package.json').version"
+          echo "Tauri config version:"
+          node -e "const fs=require('fs'); const j=JSON.parse(fs.readFileSync('./src-tauri/tauri.conf.json','utf8')); console.log(j.version)"
+          echo "All package.json files outside node_modules:"
+          find . -name package.json -not -path "*/node_modules/*" -print
 
       - name: Install Linux dependencies
         if: matrix.platform == 'ubuntu-22.04'
@@ -79,4 +97,5 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
+          projectPath: .
           args: ${{ matrix.args }}
