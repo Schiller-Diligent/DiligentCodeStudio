@@ -2,6 +2,15 @@ import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 const root = process.cwd();
+
+function readTextNoBom(filePath) {
+  return readFileSync(filePath, 'utf8').replace(/^\uFEFF/, '');
+}
+
+function readJsonNoBom(filePath) {
+  return JSON.parse(readTextNoBom(filePath));
+}
+
 const requiredFiles = [
   'package.json',
   'src/App.tsx',
@@ -16,27 +25,31 @@ const requiredFiles = [
 ];
 
 const failures = [];
+
 for (const file of requiredFiles) {
   if (!existsSync(join(root, file))) {
     failures.push(`Missing required file: ${file}`);
   }
 }
 
-const packageJson = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8'));
-const tauriConfig = JSON.parse(readFileSync(join(root, 'src-tauri/tauri.conf.json'), 'utf8'));
-const cargoToml = readFileSync(join(root, 'src-tauri/Cargo.toml'), 'utf8');
-const appSource = readFileSync(join(root, 'src/App.tsx'), 'utf8');
+const packageJson = readJsonNoBom(join(root, 'package.json'));
+const tauriConfig = readJsonNoBom(join(root, 'src-tauri/tauri.conf.json'));
+const cargoToml = readTextNoBom(join(root, 'src-tauri/Cargo.toml'));
+const appSource = readTextNoBom(join(root, 'src/App.tsx'));
 
 if (packageJson.version !== tauriConfig.version) {
-  failures.push(`Version mismatch: package.json=${packageJson.version}, tauri.conf.json=${tauriConfig.version}`);
+  failures.push(
+    `Version mismatch: package.json=${packageJson.version}, tauri.conf.json=${tauriConfig.version}`,
+  );
 }
 
 if (!cargoToml.includes(`version = "${packageJson.version}"`)) {
   failures.push('Cargo.toml version does not match package.json.');
 }
 
-// v0.6.1+ manual policy: the app opens a stable cumulative manual path. Versioned PDFs are kept as archives.
-if (!appSource.includes("/manuals/DiligentCodeStudio_UserManual.pdf")) {
+// v0.6.1+ manual policy: the app opens a stable cumulative manual path.
+// Versioned PDFs are kept as archives.
+if (!appSource.includes('/manuals/DiligentCodeStudio_UserManual.pdf')) {
   failures.push('App manual path should use the stable cumulative manual file.');
 }
 
@@ -56,7 +69,11 @@ if (!versionedManualCandidates.some((candidate) => existsSync(join(root, candida
 
 if (failures.length > 0) {
   console.error('Smoke test failed:');
-  for (const failure of failures) console.error(`- ${failure}`);
+
+  for (const failure of failures) {
+    console.error(`- ${failure}`);
+  }
+
   process.exit(1);
 }
 
