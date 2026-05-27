@@ -14,13 +14,14 @@ jobs:
       matrix:
         include:
           - platform: windows-latest
-            args: ""
           - platform: macos-latest
-            args: ""
           - platform: ubuntu-22.04
-            args: ""
 
     runs-on: ${{ matrix.platform }}
+
+    defaults:
+      run:
+        working-directory: ${{ github.workspace }}
 
     steps:
       - name: Checkout repository
@@ -28,21 +29,6 @@ jobs:
         with:
           ref: ${{ github.ref }}
           fetch-depth: 0
-
-      - name: Show checkout and version diagnostics
-        shell: bash
-        run: |
-          echo "GITHUB_REF=$GITHUB_REF"
-          echo "GITHUB_SHA=$GITHUB_SHA"
-          echo "PWD=$(pwd)"
-          git branch --show-current || true
-          git rev-parse HEAD
-          echo "Root package version:"
-          node -p "require('./package.json').version"
-          echo "Tauri config version:"
-          node -e "const fs=require('fs'); const j=JSON.parse(fs.readFileSync('./src-tauri/tauri.conf.json','utf8')); console.log(j.version)"
-          echo "All package.json files outside node_modules:"
-          find . -name package.json -not -path "*/node_modules/*" -print
 
       - name: Install Linux dependencies
         if: matrix.platform == 'ubuntu-22.04'
@@ -61,6 +47,7 @@ jobs:
         with:
           node-version: "22.12.0"
           cache: "npm"
+          cache-dependency-path: package-lock.json
 
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
@@ -77,6 +64,16 @@ jobs:
           npm config set fetch-retry-mintimeout 20000
           npm config set fetch-retry-maxtimeout 120000
 
+      - name: Verify checkout version
+        run: |
+          git rev-parse HEAD
+          npm pkg get version
+          node -e "const v=require('./package.json').version; if (v !== '0.6.10') { console.error('Wrong package version: ' + v); process.exit(1); } console.log('Verified package version: ' + v);"
+
+      - name: List package files
+        run: |
+          node -e "const fs=require('fs'); const path=require('path'); function walk(d){ for(const f of fs.readdirSync(d)){ const p=path.join(d,f); if(p.includes('node_modules') || p.includes('src-tauri/target')) continue; const s=fs.statSync(p); if(s.isDirectory()) walk(p); else if(f==='package.json') console.log(p); }} walk('.');"
+
       - name: Install frontend dependencies
         run: npm ci
 
@@ -92,10 +89,13 @@ jobs:
       - name: Check Rust
         run: npm run check:rust
 
-      - name: Build Tauri app
-        uses: tauri-apps/tauri-action@v0
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Build Tauri app from repository root
+        run: npm run tauri:build
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
         with:
-          projectPath: .
-          args: ${{ matrix.args }}
+          name: diligent-code-studio-${{ matrix.platform }}
+          path: |
+            src-tauri/target/release/bundle/**/*
+          if-no-files-found: warn
