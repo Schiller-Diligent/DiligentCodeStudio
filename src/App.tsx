@@ -1383,7 +1383,7 @@ export default function App() {
           title: 'Start Here',
           summary: 'Use this dashboard when you are not sure where to begin. It points you to setup, projects, AI help, web building, and release packaging.',
           nextStep: workspacePath.trim() ? 'Open or create a file, then use AI Coding Assistant to review the project.' : 'Choose a workspace folder or create a sample project from Templates.',
-          prompt: 'Guide me through the Start Here dashboard and recommend the next best step for my current workspace.',
+          prompt: 'Explain the Start Here dashboard and recommend the next best step for my current workspace.',
         };
       case 'templates':
         return {
@@ -1495,7 +1495,7 @@ export default function App() {
           title: 'Diligent Code Studio',
           summary: 'Use this workspace to build, test, troubleshoot, and release software with local-first AI support.',
           nextStep: 'Open Start Here if you are unsure what to do next.',
-          prompt: 'Guide me through Diligent Code Studio and recommend the next best step.',
+          prompt: 'Explain Diligent Code Studio and recommend the next best step.',
         };
     }
   }
@@ -3376,7 +3376,6 @@ ERROR: ${String(error)}
         <div className="app-top-actions">
           <button className="secondary-button" onClick={() => setHelpManualOpen(true)} title="Open the built-in PDF user manual"><ExternalLink size={14} /> Manual</button>
           <button className="secondary-button" onClick={() => setActivePage('setup')}><PackageCheck size={14} /> Setup</button>
-          <button className="secondary-button" onClick={openGuideForCurrentPage}><BrainCircuit size={14} /> Guide Me</button>
           <button className={`secondary-button ${aiDockOpen ? 'active-toolbar-action' : ''}`} onClick={() => setAiDockOpen((current) => !current)}><Bot size={14} /> {aiDockOpen ? 'Close AI Help' : 'AI Help'}</button>
         </div>
       </header>
@@ -3515,21 +3514,6 @@ ERROR: ${String(error)}
             </div>
           </div>
         </header>
-
-
-
-        <section className="screen-guide-card" aria-label="Current screen guide">
-          <div className="guide-card-copy">
-            <div className="guide-eyebrow"><BrainCircuit size={14} /> What this page does</div>
-            <h3>{pageGuide(activePage).title}</h3>
-            <p>{pageGuide(activePage).summary}</p>
-            <p className="guide-next"><strong>Good next step:</strong> {pageGuide(activePage).nextStep}</p>
-          </div>
-          <div className="guide-card-actions">
-            <button className="secondary-button" onClick={openGuideForCurrentPage}><Bot size={14} /> Guide Me</button>
-            {preferences.interfaceMode === 'beginner' && <button className="secondary-button" onClick={() => completeOnboarding('start')}><Rocket size={14} /> Start Here</button>}
-          </div>
-        </section>
 
 
         {activePage === 'start' && (
@@ -4998,12 +4982,12 @@ ERROR: ${String(error)}
       )}
 
       {helpManualOpen && (
-        <section className="help-manual-overlay" role="dialog" aria-modal="true" aria-label="Diligent Code Studio User Manual">
+        <section className="help-manual-overlay" role="dialog" aria-modal="true" aria-label="Diligent Code Studio Operator/User Manual">
           <div className="help-manual-dialog">
             <header className="help-manual-header">
               <div>
-                <strong>Diligent Code Studio User Manual</strong>
-                <span>PDF help for setup, navigation, AI assistance, Git, diagnostics, and release packaging.</span>
+                <strong>Diligent Code Studio Operator/User Manual</strong>
+                <span>PDF help for installation, setup, navigation, AI assistance, Git, diagnostics, troubleshooting, and release packaging.</span>
               </div>
               <div className="help-manual-actions">
                 <button className="secondary-button" onClick={() => window.open(USER_MANUAL_PATH, '_blank', 'noopener,noreferrer')}><ExternalLink size={14} /> Open PDF</button>
@@ -5012,7 +4996,7 @@ ERROR: ${String(error)}
             </header>
             <iframe
               className="help-manual-frame"
-              title="Diligent Code Studio User Manual PDF"
+              title="Diligent Code Studio Operator/User Manual PDF"
               src={`${USER_MANUAL_PATH}#view=FitH`}
             />
           </div>

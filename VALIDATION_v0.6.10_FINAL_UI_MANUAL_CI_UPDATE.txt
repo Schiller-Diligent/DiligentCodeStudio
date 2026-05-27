@@ -1,0 +1,19 @@
+Diligent Code Studio v0.6.10 final UI/manual/CI update validation
+
+Date: May 27, 2026
+
+Changes verified in source package:
+- Top toolbar Guide Me button removed from src/App.tsx.
+- Duplicate on-page What this page does / Guide Me guidance area was already removed in the prior cleanup.
+- Manual, Setup, and AI Help toolbar actions remain.
+- In-app manual stable path remains /manuals/DiligentCodeStudio_UserManual.pdf.
+- Bundled PDF manual replaced with Diligent Code Studio v0.6.10 Operator/User Manual Revision 1.1.
+- GitHub Actions npm registry/retry fix retained.
+
+Manual validation:
+- DOCX rendered successfully to PDF and page PNGs using LibreOffice headless.
+- Rendered manual page count: 17 pages.
+- Visual QA completed on rendered page images; no obvious clipping, overlap, or missing pages observed.
+
+Notes:
+- npm/TypeScript/Rust validation should be run on the Windows development machine after extracting this package, because this sandbox copy does not include node_modules and cannot fetch npm dependencies from the public internet.

@@ -9,6 +9,15 @@ on:
 permissions:
   contents: read
 
+env:
+  NPM_CONFIG_REGISTRY: https://registry.npmjs.org/
+  NPM_CONFIG_FETCH_TIMEOUT: '120000'
+  NPM_CONFIG_FETCH_RETRIES: '5'
+  NPM_CONFIG_FETCH_RETRY_MINTIMEOUT: '20000'
+  NPM_CONFIG_FETCH_RETRY_MAXTIMEOUT: '120000'
+  NPM_CONFIG_FUND: 'false'
+  NPM_CONFIG_UPDATE_NOTIFIER: 'false'
+
 jobs:
   quality-build:
     name: Typecheck, tests, frontend build, and audits
@@ -22,7 +31,9 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '22.12.0'
+          registry-url: 'https://registry.npmjs.org'
           cache: npm
+          cache-dependency-path: package-lock.json
 
       - name: Setup Rust toolchain
         uses: dtolnay/rust-toolchain@stable
@@ -32,8 +43,9 @@ jobs:
         with:
           workspaces: src-tauri -> target
 
-      - name: Install npm dependencies
-        run: npm ci
+      - name: Install npm dependencies with retry
+        shell: pwsh
+        run: ./scripts/Install-NpmDependencies.ps1
 
       - name: Run TypeScript, smoke, unit, security, build, and npm audit checks
         run: npm run quality

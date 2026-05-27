@@ -1,5 +1,13 @@
 # Changelog
 
+## v0.6.10 - Final UI, Manual, and CI Update
+
+- Removed the top toolbar **Guide Me** button.
+- Kept **Manual**, **Setup**, and **AI Help** as the primary top toolbar actions.
+- Retained the prior cleanup that removed the duplicated on-page **What this page does** / **Guide Me** guidance area.
+- Replaced the bundled in-app PDF with **Diligent Code Studio v0.6.10 Operator/User Manual Revision 1.1**.
+- Retained the GitHub Actions npm registry/retry hardening for `npm ci`.
+
 ## v0.6.10 - NPM Audit Fix and Source Package Cleanup
 
 - Pinned `monaco-editor` to `0.53.0` to avoid the vulnerable DOMPurify dependency chain reported through newer Monaco builds.
