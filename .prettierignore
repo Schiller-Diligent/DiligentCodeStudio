@@ -1,0 +1,7 @@
+dist/
+node_modules/
+src-tauri/target/
+releases/
+*.pdf
+*.zip
+package-lock.json

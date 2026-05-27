@@ -1,0 +1,19 @@
+Diligent Code Studio v0.6.8 validation
+
+Validated successfully:
+- npm ci
+- npm run validate
+- npm run build
+- PDF manual rendered to PNG for visual verification
+
+Notes:
+- Cargo/Rust/Tauri native build could not be executed in this sandbox because Cargo is not installed here.
+- Run the following locally for the full native desktop build:
+  npm run check:rust
+  npm run tauri:build
+
+Feature validation:
+- Open Source Credits page added to Workspace Menu.
+- Open Source Credits page added to Start Here and Welcome Wizard navigation.
+- Each credit uses the existing Tauri open_external_url command to open the default browser.
+- Cumulative manual kept the original v0.5.5 manual first and appended the v0.6.8 addendum.

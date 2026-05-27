@@ -1,0 +1,10 @@
+Diligent Code Studio v0.6.7 validation
+
+Validated commands:
+- npm ci
+- npm run validate
+- npm run build
+
+Rust/Tauri native build should be run on a Windows development computer with Rust/Cargo installed:
+- npm run check:rust
+- npm run tauri:build

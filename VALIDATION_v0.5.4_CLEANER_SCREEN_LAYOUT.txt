@@ -1,0 +1,12 @@
+Diligent Code Studio v0.5.4 Cleaner Screen Layout validation
+
+Validated commands:
+- npm ci
+- npm run build
+
+Result:
+- TypeScript compiled successfully.
+- Vite production frontend build completed successfully.
+- Global bottom Terminal/Workbench panel removed from every screen.
+- Dedicated Terminal page remains available.
+- Compact AI Help remains available on every screen.

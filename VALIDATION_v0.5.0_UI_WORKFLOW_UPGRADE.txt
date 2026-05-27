@@ -1,0 +1,13 @@
+Diligent Code Studio v0.5.0 UI + Workflow Upgrade Validation
+
+Validated commands:
+- npm ci
+- npm run build
+
+Result:
+- TypeScript compile passed.
+- Vite production frontend build passed.
+
+Notes:
+- Rust/Cargo is not available in this sandbox, so local Tauri executable packaging was not performed here.
+- Use npm run tauri:build locally or GitHub Actions to produce native installers.

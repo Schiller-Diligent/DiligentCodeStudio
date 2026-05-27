@@ -1,0 +1,17 @@
+Diligent Code Studio v0.6.9 validation
+
+Scope:
+- Remove Setup & Dependencies from main Workspace Menu.
+- Keep Setup accessible from the top-right Setup button.
+- Preserve Workspace Menu drag-and-drop and reset behavior.
+- Keep cumulative manual policy intact.
+
+Validation performed:
+- npm ci
+- npm run validate
+- npm run build
+
+Notes:
+- Older saved menuPageOrder preferences that include setup are filtered by normalizePageOrder.
+- The Setup page remains a valid internal page and can still be opened from top-right Setup and onboarding actions.
+- Native Tauri build should still be tested on a Windows machine with Cargo installed.

@@ -1,0 +1,11 @@
+Diligent Code Studio v0.5.5 Help/User Manual validation
+
+Validated tasks:
+- Generated PDF User Manual.
+- Rendered PDF pages to PNG for layout verification.
+- Added manual to public/manuals and docs.
+- Added top-right Help button.
+- Added in-app PDF viewer overlay.
+- Bumped package, package-lock, Tauri, and Cargo versions to 0.5.5.
+- npm ci passed.
+- npm run build passed.

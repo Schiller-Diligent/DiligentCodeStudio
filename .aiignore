@@ -14,3 +14,11 @@ dist/
 build/
 src-tauri/target/
 releases/
+*.env
+*.sqlite
+*.db
+*.bak
+*.backup
+id_rsa
+id_ed25519
+*.ppk

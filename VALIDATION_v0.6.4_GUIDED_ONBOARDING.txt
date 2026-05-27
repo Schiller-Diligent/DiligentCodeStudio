@@ -1,0 +1,12 @@
+Diligent Code Studio v0.6.4 validation
+
+Validated in sandbox:
+- npm ci
+- npm run validate
+- npm run build
+
+Not run in sandbox:
+- npm run check:rust
+- npm run tauri:build
+
+Reason: Rust/Cargo is not installed in the sandbox environment.

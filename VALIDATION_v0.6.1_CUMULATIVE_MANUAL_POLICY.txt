@@ -1,0 +1,18 @@
+Diligent Code Studio v0.6.1 Cumulative Manual Policy Validation
+
+Validated changes:
+- Original v0.5.5 PDF manual preserved at the beginning of the cumulative PDF.
+- v0.6.1 addendum appended after the original manual.
+- App manual path changed to /manuals/DiligentCodeStudio_UserManual.pdf.
+- App version strings updated to v0.6.1.
+- package.json, package-lock.json, src-tauri/tauri.conf.json, and src-tauri/Cargo.toml updated to 0.6.1.
+
+Validation commands:
+- npm ci
+- npm run validate
+- npm run build
+
+PDF validation:
+- Rendered 12 pages successfully with pdfium renderer.
+- Checked page 1 to confirm the original v0.5.5 manual remains first.
+- Checked addendum pages 10-12 for the v0.6.1 manual policy and version addenda.

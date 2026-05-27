@@ -1,0 +1,34 @@
+Diligent Code Studio v0.6.2 Web Builder + Hosting Tools Validation
+
+Date: 2026-05-26
+
+Validated successfully in sandbox:
+
+1. npm run validate
+   - TypeScript check passed.
+   - Smoke test passed.
+   - Unit tests passed.
+   - Security check passed.
+
+2. npm run build
+   - Vite production build completed successfully.
+   - dist/ output generated.
+
+3. PDF manual render inspection
+   - Page 1 still starts with the original v0.5.5 manual.
+   - v0.6.2 addendum pages render without obvious clipping or overflow.
+
+Not completed in sandbox:
+
+- cargo check --manifest-path src-tauri/Cargo.toml
+- npm run tauri:build
+
+Reason: Cargo/Rust is not installed in this sandbox.
+
+Recommended local validation:
+
+npm run validate
+npm run build
+npm run check:rust
+npm run test:rust
+npm run tauri:build

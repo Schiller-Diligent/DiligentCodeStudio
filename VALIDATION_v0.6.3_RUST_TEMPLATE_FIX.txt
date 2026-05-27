@@ -1,0 +1,18 @@
+Diligent Code Studio v0.6.3 Rust Template Build Fix Validation
+
+Validated in sandbox:
+- npm ci
+- npm run validate
+- npm run build
+
+Rust/Cargo validation could not be executed in the sandbox because Cargo is not installed here.
+
+Targeted fix verification:
+- Inspected src-tauri/src/main.rs static website template generator.
+- Confirmed the affected index.html template now uses r##"..."## so href="#content" no longer terminates the raw string early.
+- Confirmed no remaining href="#..." sequence exists inside a one-hash r# raw string in main.rs.
+
+Recommended local test:
+- npm run check:rust
+- npm run test:rust
+- npm run tauri:build
