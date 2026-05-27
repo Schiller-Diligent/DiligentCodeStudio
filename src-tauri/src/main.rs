@@ -1,9 +1,13 @@
+#![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
+
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::fs;
 use std::io::Read;
 use std::path::{Path, PathBuf};
 use std::process::Command;
+#[cfg(target_os = "windows")]
+use std::os::windows::process::CommandExt;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 const MAX_WORKSPACE_ENTRIES: usize = 5000;
@@ -11,6 +15,19 @@ const MAX_WORKSPACE_DEPTH: usize = 14;
 const MAX_PROJECT_SCAN_DEPTH: usize = 5;
 const MAX_SEARCH_RESULTS: usize = 500;
 const MAX_SEARCH_FILE_SIZE: u64 = 2 * 1024 * 1024;
+const MAX_TERMINAL_COMMAND_LENGTH: usize = 8000;
+
+#[cfg(target_os = "windows")]
+const CREATE_NO_WINDOW: u32 = 0x08000000;
+
+fn hidden_command(program: &str) -> Command {
+    let mut command = Command::new(program);
+    #[cfg(target_os = "windows")]
+    {
+        command.creation_flags(CREATE_NO_WINDOW);
+    }
+    command
+}
 
 #[derive(Debug, Serialize)]
 struct TerminalResult {
@@ -217,6 +234,23 @@ fn ensure_directory(path: &Path) -> Result<(), String> {
         return Err(format!("Path is not a directory: {}", path.display()));
     }
     Ok(())
+}
+
+fn io_error(action: &str, path: &Path, error: std::io::Error) -> String {
+    format!("Unable to {action} {}: {error}", path.display())
+}
+
+fn write_text_file_safely(path: &Path, contents: String) -> Result<(), String> {
+    if let Some(parent) = path.parent() {
+        if !parent.exists() {
+            return Err(format!("Parent directory does not exist: {}", parent.display()));
+        }
+        if !parent.is_dir() {
+            return Err(format!("Parent path is not a directory: {}", parent.display()));
+        }
+    }
+
+    fs::write(path, contents).map_err(|error| io_error("write", path, error))
 }
 
 fn validate_child_name(name: &str) -> Result<String, String> {
@@ -489,7 +523,7 @@ fn detect_project(path: String) -> Result<ProjectInfo, String> {
 }
 
 fn command_version(command: &str, args: &[&str]) -> String {
-    let output = Command::new(command).args(args).output();
+    let output = hidden_command(command).args(args).output();
     match output {
         Ok(value) => {
             let stdout = String::from_utf8_lossy(&value.stdout).trim().to_string();
@@ -511,7 +545,7 @@ fn command_version(command: &str, args: &[&str]) -> String {
 fn tool_available(command: &str) -> bool {
     #[cfg(target_os = "windows")]
     {
-        Command::new("where.exe")
+        hidden_command("where.exe")
             .arg(command)
             .output()
             .map(|output| output.status.success())
@@ -520,7 +554,7 @@ fn tool_available(command: &str) -> bool {
 
     #[cfg(not(target_os = "windows"))]
     {
-        Command::new("which")
+        hidden_command("which")
             .arg(command)
             .output()
             .map(|output| output.status.success())
@@ -662,7 +696,7 @@ fn detect_visual_studio_build_tools() -> Option<String> {
 
     for vswhere in vswhere_paths {
         if Path::new(vswhere).exists() {
-            let output = Command::new(vswhere)
+            let output = hidden_command(vswhere)
                 .args([
                     "-latest",
                     "-products",
@@ -907,6 +941,42 @@ fn setup_dependency_definitions() -> Vec<SetupDependency> {
             "Useful for advanced GitHub release and workflow automation.",
         ));
         deps.push(setup_dependency(
+            "vercelcli",
+            "Vercel CLI",
+            "Web Builder",
+            "Optional global deployment CLI for preview and production web deployments.",
+            "vercel",
+            &["--version"],
+            false,
+            "npm install -g vercel",
+            "https://vercel.com/docs/cli",
+            "Requires Node.js/npm and a Vercel account. CLI login may be required before deploying.",
+        ));
+        deps.push(setup_dependency(
+            "netlifycli",
+            "Netlify CLI",
+            "Web Builder",
+            "Optional global deployment CLI for Netlify previews and production deploys.",
+            "netlify",
+            &["--version"],
+            false,
+            "npm install -g netlify-cli",
+            "https://docs.netlify.com/cli/get-started/",
+            "Requires Node.js/npm and a Netlify account. CLI login may be required before deploying.",
+        ));
+        deps.push(setup_dependency(
+            "pnpm",
+            "pnpm",
+            "Web Builder",
+            "Optional fast package manager for modern web projects.",
+            "pnpm",
+            &["--version"],
+            false,
+            "npm install -g pnpm",
+            "https://pnpm.io/installation",
+            "Optional; npm remains supported. Restart terminals after global installation.",
+        ));
+        deps.push(setup_dependency(
             "innosetup",
             "Inno Setup",
             "Optional Packaging",
@@ -929,6 +999,9 @@ fn setup_dependency_definitions() -> Vec<SetupDependency> {
         deps.push(setup_dependency("dotnet", ".NET SDK", "Optional Build Tools", "Optional SDK for C#/.NET projects and templates.", "dotnet", &["--version"], false, "", "https://dotnet.microsoft.com/download", "Install only if you plan to build C#/.NET projects."));
         deps.push(setup_ollama_dependency("", "https://ollama.com/download"));
         deps.push(setup_dependency("githubcli", "GitHub CLI", "Optional Build Tools", "Optional command-line helper for GitHub authentication, releases, and workflows.", "gh", &["--version"], false, "", "https://cli.github.com/", "Useful for advanced GitHub release and workflow automation."));
+        deps.push(setup_dependency("vercelcli", "Vercel CLI", "Web Builder", "Optional global deployment CLI for preview and production web deployments.", "vercel", &["--version"], false, "npm install -g vercel", "https://vercel.com/docs/cli", "Requires Node.js/npm and a Vercel account."));
+        deps.push(setup_dependency("netlifycli", "Netlify CLI", "Web Builder", "Optional global deployment CLI for Netlify previews and production deploys.", "netlify", &["--version"], false, "npm install -g netlify-cli", "https://docs.netlify.com/cli/get-started/", "Requires Node.js/npm and a Netlify account."));
+        deps.push(setup_dependency("pnpm", "pnpm", "Web Builder", "Optional fast package manager for modern web projects.", "pnpm", &["--version"], false, "npm install -g pnpm", "https://pnpm.io/installation", "Optional; npm remains supported."));
     }
 
     deps
@@ -954,14 +1027,14 @@ fn install_setup_dependency(dependency_id: String) -> Result<TerminalResult, Str
     let command_text = dep.install_command.clone();
 
     #[cfg(target_os = "windows")]
-    let output = Command::new("cmd.exe")
+    let output = hidden_command("cmd.exe")
         .args(["/C", command_text.as_str()])
         .current_dir(&cwd)
         .output()
         .map_err(|error| format!("Unable to start installer command: {}", error))?;
 
     #[cfg(not(target_os = "windows"))]
-    let output = Command::new(default_shell_command())
+    let output = hidden_command(default_shell_command())
         .arg("-lc")
         .arg(command_text.as_str())
         .current_dir(&cwd)
@@ -1002,19 +1075,19 @@ fn open_external_url(url: String) -> Result<(), String> {
     }
 
     #[cfg(target_os = "windows")]
-    let status = Command::new("cmd.exe")
+    let status = hidden_command("cmd.exe")
         .args(["/C", "start", "", trimmed])
         .status()
         .map_err(|error| format!("Unable to open URL: {}", error))?;
 
     #[cfg(target_os = "macos")]
-    let status = Command::new("open")
+    let status = hidden_command("open")
         .arg(trimmed)
         .status()
         .map_err(|error| format!("Unable to open URL: {}", error))?;
 
     #[cfg(all(not(target_os = "windows"), not(target_os = "macos")))]
-    let status = Command::new("xdg-open")
+    let status = hidden_command("xdg-open")
         .arg(trimmed)
         .status()
         .map_err(|error| format!("Unable to open URL: {}", error))?;
@@ -1059,18 +1132,13 @@ fn list_directory(path: String) -> Result<Vec<WorkspaceEntry>, String> {
 fn read_text_file(path: String) -> Result<String, String> {
     let file = normalize_path(&path)?;
     ensure_file(&file)?;
-    fs::read_to_string(&file).map_err(|error| format!("Unable to read UTF-8 text file: {error}"))
+    fs::read_to_string(&file).map_err(|error| io_error("read UTF-8 text file", &file, error))
 }
 
 #[tauri::command]
 fn write_text_file(path: String, contents: String) -> Result<(), String> {
     let file = normalize_path(&path)?;
-    if let Some(parent) = file.parent() {
-        if !parent.exists() {
-            return Err(format!("Parent directory does not exist: {}", parent.display()));
-        }
-    }
-    fs::write(&file, contents).map_err(|error| format!("Unable to write file: {error}"))
+    write_text_file_safely(&file, contents)
 }
 
 #[tauri::command]
@@ -1090,13 +1158,7 @@ fn save_text_file_as(suggested: String, contents: String) -> Result<Option<Strin
         return Ok(None);
     };
 
-    if let Some(parent) = path.parent() {
-        if !parent.exists() {
-            return Err(format!("Parent directory does not exist: {}", parent.display()));
-        }
-    }
-
-    fs::write(&path, contents).map_err(|error| format!("Unable to save file: {error}"))?;
+    write_text_file_safely(&path, contents)?;
     Ok(Some(path.to_string_lossy().to_string()))
 }
 
@@ -1111,7 +1173,7 @@ fn create_text_file(parent: String, name: String, contents: String) -> Result<St
         return Err(format!("A file or folder already exists at {}", file_path.display()));
     }
 
-    fs::write(&file_path, contents).map_err(|error| format!("Unable to create file: {error}"))?;
+    write_text_file_safely(&file_path, contents)?;
     Ok(file_path.to_string_lossy().to_string())
 }
 
@@ -1126,7 +1188,7 @@ fn create_folder(parent: String, name: String) -> Result<String, String> {
         return Err(format!("A file or folder already exists at {}", folder_path.display()));
     }
 
-    fs::create_dir(&folder_path).map_err(|error| format!("Unable to create folder: {error}"))?;
+    fs::create_dir(&folder_path).map_err(|error| io_error("create folder", &folder_path, error))?;
     Ok(folder_path.to_string_lossy().to_string())
 }
 
@@ -1147,7 +1209,7 @@ fn rename_path(path: String, name: String) -> Result<String, String> {
         return Err(format!("A file or folder already exists at {}", new_path.display()));
     }
 
-    fs::rename(&current_path, &new_path).map_err(|error| format!("Unable to rename: {error}"))?;
+    fs::rename(&current_path, &new_path).map_err(|error| io_error("rename", &current_path, error))?;
     Ok(new_path.to_string_lossy().to_string())
 }
 
@@ -1159,9 +1221,9 @@ fn delete_path(path: String) -> Result<(), String> {
     }
 
     if target.is_dir() {
-        fs::remove_dir_all(&target).map_err(|error| format!("Unable to delete folder: {error}"))?;
+        fs::remove_dir_all(&target).map_err(|error| io_error("delete folder", &target, error))?;
     } else {
-        fs::remove_file(&target).map_err(|error| format!("Unable to delete file: {error}"))?;
+        fs::remove_file(&target).map_err(|error| io_error("delete file", &target, error))?;
     }
 
     Ok(())
@@ -1371,7 +1433,7 @@ fn git_root_for_path(path: &str) -> Result<PathBuf, String> {
 }
 
 fn run_git_command(root: &Path, args: &[&str]) -> Result<String, String> {
-    let output = Command::new("git")
+    let output = hidden_command("git")
         .args(args)
         .current_dir(root)
         .output()
@@ -1632,19 +1694,33 @@ fn normalize_command_for_platform(command_text: &str) -> String {
     trimmed.to_string()
 }
 
+fn validate_terminal_command(command_text: &str) -> Result<String, String> {
+    let trimmed = command_text.trim();
+    if trimmed.is_empty() {
+        return Err("Command cannot be empty.".to_string());
+    }
+    if trimmed.len() > MAX_TERMINAL_COMMAND_LENGTH {
+        return Err(format!("Command is too long. Maximum length is {} characters.", MAX_TERMINAL_COMMAND_LENGTH));
+    }
+    if trimmed.contains('\0') {
+        return Err("Command contains an invalid null character.".to_string());
+    }
+    if trimmed.chars().any(|ch| ch.is_control() && ch != '\t') {
+        return Err("Command contains unsupported control characters.".to_string());
+    }
+    Ok(trimmed.to_string())
+}
+
 #[tauri::command]
 fn run_terminal_command(cwd: String, command: String, shell: Option<String>) -> Result<TerminalResult, String> {
     let working_dir = normalize_path(&cwd)?;
     ensure_directory(&working_dir)?;
 
-    let clean_command = normalize_command_for_platform(&command);
-    if clean_command.is_empty() {
-        return Err("Command cannot be empty.".to_string());
-    }
+    let clean_command = validate_terminal_command(&normalize_command_for_platform(&command))?;
 
     let shell_command = shell_executable(shell);
     let shell_lower = shell_command.to_lowercase();
-    let mut command_builder = Command::new(&shell_command);
+    let mut command_builder = hidden_command(&shell_command);
 
     if shell_lower == "cmd.exe" {
         command_builder.arg("/C").arg(&clean_command);
@@ -1942,7 +2018,7 @@ fn create_release_package(workspace_path: String, release_notes: String) -> Resu
             ps_single_quote(&source),
             ps_single_quote(&zip_path.to_string_lossy())
         );
-        let output = Command::new("powershell.exe")
+        let output = hidden_command("powershell.exe")
             .arg("-NoProfile")
             .arg("-ExecutionPolicy")
             .arg("Bypass")
@@ -1970,7 +2046,7 @@ fn create_release_package(workspace_path: String, release_notes: String) -> Resu
             .map(|value| value.to_string_lossy().to_string())
             .unwrap_or_else(|| "DiligentCodeStudio_release.zip".to_string());
 
-        let output = Command::new("zip")
+        let output = hidden_command("zip")
             .arg("-r")
             .arg(&zip_name)
             .arg(&release_name)
@@ -2332,9 +2408,15 @@ fn project_templates() -> Vec<ProjectTemplate> {
         },
         ProjectTemplate {
             id: "web_project".to_string(),
-            name: "Web Project".to_string(),
-            description: "Static HTML/CSS/JavaScript site starter.".to_string(),
+            name: "Static Website".to_string(),
+            description: "Static HTML/CSS/JavaScript site starter for local preview and static hosting.".to_string(),
             files: vec!["index.html", "src/styles.css", "src/app.js", "assets/.gitkeep", "README.md", ".gitignore"].into_iter().map(String::from).collect(),
+        },
+        ProjectTemplate {
+            id: "react_vite_site".to_string(),
+            name: "React + Vite Website".to_string(),
+            description: "Modern React/Vite/TypeScript website starter with local preview, build, and deployment scripts.".to_string(),
+            files: vec!["package.json", "index.html", "src/main.tsx", "src/App.tsx", "src/styles.css", "public/.gitkeep", "README.md", ".gitignore"].into_iter().map(String::from).collect(),
         },
         ProjectTemplate {
             id: "diligent_release_package".to_string(),
@@ -2460,11 +2542,119 @@ fn create_project_from_template(parent_path: String, project_name: String, templ
             write_project_file(&project_path, ".gitignore", gitignore_text(), &mut created)?;
         }
         "web_project" => {
-            write_project_file(&project_path, "index.html", &format!("<!doctype html>\n<html lang=\"en\">\n<head>\n  <meta charset=\"utf-8\" />\n  <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\" />\n  <title>{}</title>\n  <link rel=\"stylesheet\" href=\"src/styles.css\" />\n</head>\n<body>\n  <main class=\"site\">\n    <h1>{}</h1>\n    <p>Web project starter created by Diligent Code Studio.</p>\n  </main>\n  <script src=\"src/app.js\"></script>\n</body>\n</html>\n", title, title), &mut created)?;
-            write_project_file(&project_path, "src/styles.css", "body { margin: 0; font-family: Segoe UI, Arial, sans-serif; background: #0f172a; color: #e5e7eb; } .site { padding: 40px; }\n", &mut created)?;
-            write_project_file(&project_path, "src/app.js", "console.log('Web project ready.');\n", &mut created)?;
+            write_project_file(&project_path, "index.html", &format!(r##"<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="description" content="{} website created with Diligent Code Studio" />
+  <title>{}</title>
+  <link rel="stylesheet" href="src/styles.css" />
+</head>
+<body>
+  <header class="hero">
+    <p class="eyebrow">Diligent Code Studio Website Starter</p>
+    <h1>{}</h1>
+    <p>Build locally, preview on your network, and publish globally when ready.</p>
+    <a class="button" href="#content">Explore the site</a>
+  </header>
+  <main id="content" class="site-grid">
+    <section><h2>Local Preview</h2><p>Use Web Builder to run a local or LAN preview server.</p></section>
+    <section><h2>Global Hosting</h2><p>Deploy static files to GitHub Pages, Netlify, Vercel, or your own web host.</p></section>
+    <section><h2>Next Steps</h2><p>Customize content, images, navigation, SEO metadata, and deployment settings.</p></section>
+  </main>
+  <script src="src/app.js"></script>
+</body>
+</html>
+"##, title, title, title), &mut created)?;
+            write_project_file(&project_path, "src/styles.css", "* { box-sizing: border-box; } body { margin: 0; font-family: Segoe UI, Arial, sans-serif; background: #0f172a; color: #e5e7eb; } .hero { min-height: 52vh; display: grid; place-content: center; gap: 16px; padding: 56px 24px; text-align: center; background: radial-gradient(circle at top, #1e3a8a, transparent 55%), #020617; } .hero h1 { margin: 0; font-size: clamp(2.4rem, 7vw, 5rem); } .eyebrow { color: #38bdf8; text-transform: uppercase; letter-spacing: .16em; font-weight: 700; } .button { justify-self: center; padding: 12px 18px; border-radius: 999px; background: #2563eb; color: white; text-decoration: none; font-weight: 700; } .site-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 18px; padding: 32px; } section { border: 1px solid rgba(148,163,184,.24); background: rgba(15,23,42,.72); border-radius: 18px; padding: 22px; }\n", &mut created)?;
+            write_project_file(&project_path, "src/app.js", "console.log('Static website starter ready.');\n", &mut created)?;
             write_project_file(&project_path, "assets/.gitkeep", "", &mut created)?;
-            write_project_file(&project_path, "README.md", &format!("# {}\n\nStatic web project starter.\n", title), &mut created)?;
+            write_project_file(&project_path, "README.md", &format!("# {}\n\nStatic website starter created by Diligent Code Studio.\n\n## Local Preview\n\nUse the Web Builder page to run a local preview or LAN preview. For simple static hosting, publish the project files or connect the repository to GitHub Pages, Netlify, Vercel, or your hosting provider.\n", title), &mut created)?;
+            write_project_file(&project_path, ".gitignore", gitignore_text(), &mut created)?;
+        }
+        "react_vite_site" => {
+            write_project_file(&project_path, "package.json", &format!(r#"{{
+  "name": "{}",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {{
+    "dev": "vite --host 127.0.0.1",
+    "dev:lan": "vite --host 0.0.0.0",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview --host 127.0.0.1"
+  }},
+  "dependencies": {{
+    "lucide-react": "latest",
+    "react": "latest",
+    "react-dom": "latest"
+  }},
+  "devDependencies": {{
+    "@types/react": "latest",
+    "@types/react-dom": "latest",
+    "@vitejs/plugin-react": "latest",
+    "typescript": "latest",
+    "vite": "latest"
+  }}
+}}
+"#, safe_name.to_lowercase()), &mut created)?;
+            write_project_file(&project_path, "index.html", "<div id=\"root\"></div><script type=\"module\" src=\"/src/main.tsx\"></script>\n", &mut created)?;
+            write_project_file(&project_path, "vite.config.ts", "import { defineConfig } from 'vite';\nimport react from '@vitejs/plugin-react';\n\nexport default defineConfig({\n  plugins: [react()],\n});\n", &mut created)?;
+            write_project_file(&project_path, "tsconfig.json", r#"{
+  "compilerOptions": {
+    "target": "ES2022",
+    "useDefineForClassFields": true,
+    "lib": ["DOM", "DOM.Iterable", "ES2022"],
+    "allowJs": false,
+    "skipLibCheck": true,
+    "esModuleInterop": true,
+    "allowSyntheticDefaultImports": true,
+    "strict": true,
+    "forceConsistentCasingInFileNames": true,
+    "module": "ESNext",
+    "moduleResolution": "Node",
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "noEmit": true,
+    "jsx": "react-jsx"
+  },
+  "include": ["src", "vite.config.ts"]
+}
+"#, &mut created)?;
+            write_project_file(&project_path, "src/main.tsx", "import React from 'react';\nimport ReactDOM from 'react-dom/client';\nimport App from './App';\nimport './styles.css';\n\nReactDOM.createRoot(document.getElementById('root')!).render(<App />);\n", &mut created)?;
+            write_project_file(&project_path, "src/App.tsx", &format!(r#"import {{ Rocket, Globe2, Server }} from 'lucide-react';
+
+const features = [
+  ['Local preview', 'Run npm run dev for local development.'],
+  ['LAN testing', 'Run npm run dev:lan to test from another device.'],
+  ['Global deploy', 'Build with npm run build, then deploy dist/.'],
+];
+
+export default function App() {{
+  return (
+    <main className="app">
+      <section className="hero">
+        <p className="eyebrow"><Rocket size={{16}} /> Diligent Web Starter</p>
+        <h1>{}</h1>
+        <p>Modern React/Vite website ready for local preview, LAN testing, and global deployment.</p>
+      </section>
+      <section className="featureGrid">
+        {{features.map(([title, text], index) => (
+          <article key={{title}}>
+            {{index === 0 ? <Server /> : <Globe2 />}}
+            <h2>{{title}}</h2>
+            <p>{{text}}</p>
+          </article>
+        ))}}
+      </section>
+    </main>
+  );
+}}
+"#, title), &mut created)?;
+            write_project_file(&project_path, "src/styles.css", "body { margin: 0; font-family: Inter, Segoe UI, Arial, sans-serif; background: #020617; color: #e5e7eb; } .app { min-height: 100vh; } .hero { padding: 72px 24px; text-align: center; background: radial-gradient(circle at top, rgba(37,99,235,.45), transparent 55%); } .eyebrow { display: inline-flex; align-items: center; gap: 8px; color: #38bdf8; font-weight: 800; text-transform: uppercase; letter-spacing: .14em; } h1 { font-size: clamp(2.5rem, 8vw, 5.75rem); margin: 12px 0; } .hero p:last-child { max-width: 720px; margin: 0 auto; color: #cbd5e1; font-size: 1.2rem; } .featureGrid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 18px; padding: 32px; } article { border: 1px solid rgba(148,163,184,.22); border-radius: 22px; padding: 24px; background: rgba(15,23,42,.82); box-shadow: 0 22px 60px rgba(0,0,0,.28); } article svg { color: #38bdf8; } article p { color: #cbd5e1; }\n", &mut created)?;
+            write_project_file(&project_path, "public/.gitkeep", "", &mut created)?;
+            write_project_file(&project_path, "README.md", &format!("# {}\n\nReact + Vite website starter created by Diligent Code Studio.\n\n## Commands\n\n```powershell\nnpm install\nnpm run dev\nnpm run dev:lan\nnpm run build\nnpm run preview\n```\n\n## Deployment\n\nUse the Web Builder page to prepare Vercel, Netlify, GitHub Pages, or static-hosting deployment steps.\n", title), &mut created)?;
             write_project_file(&project_path, ".gitignore", gitignore_text(), &mut created)?;
         }
         "diligent_release_package" => {
@@ -2628,7 +2818,7 @@ fn ollama_version_status() -> (bool, String) {
     candidates.dedup();
 
     for command in candidates {
-        let output = std::process::Command::new(&command)
+        let output = hidden_command(&command)
             .arg("--version")
             .output();
 
@@ -2874,7 +3064,7 @@ fn calculate_sha256(path: String) -> Result<String, String> {
     Ok(hex::encode(hasher.finalize()))
 }
 
-fn main() {
+fn run_app() -> Result<(), tauri::Error> {
     tauri::Builder::default()
         .invoke_handler(tauri::generate_handler![
             pick_workspace_folder,
@@ -2915,5 +3105,50 @@ fn main() {
             ai_chat
         ])
         .run(tauri::generate_context!())
-        .expect("error while running Diligent Code Studio");
+}
+
+
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn child_name_validation_blocks_path_traversal() {
+        assert!(validate_child_name("safe-file.txt").is_ok());
+        assert!(validate_child_name("../secret.txt").is_err());
+        assert!(validate_child_name("bad:name.txt").is_err());
+        assert!(validate_child_name(" ").is_err());
+    }
+
+    #[test]
+    fn terminal_command_validation_blocks_empty_and_control_chars() {
+        assert_eq!(validate_terminal_command(" git status ").unwrap(), "git status");
+        assert!(validate_terminal_command("").is_err());
+        assert!(validate_terminal_command("npm run build\nwhoami").is_err());
+        assert!(validate_terminal_command("bad\0command").is_err());
+    }
+
+    #[test]
+    fn skip_directory_defaults_include_large_or_generated_folders() {
+        assert!(should_skip_directory("node_modules"));
+        assert!(should_skip_directory("target"));
+        assert!(should_skip_directory("dist"));
+        assert!(!should_skip_directory("src"));
+    }
+
+    #[test]
+    fn command_normalization_handles_npm_for_platform() {
+        let normalized = normalize_command_for_platform("npm run build");
+        #[cfg(target_os = "windows")]
+        assert!(normalized.starts_with("npm.cmd "));
+        #[cfg(not(target_os = "windows"))]
+        assert!(normalized.starts_with("npm "));
+    }
+}
+
+fn main() {
+    if let Err(error) = run_app() {
+        eprintln!("Diligent Code Studio failed to start: {error}");
+    }
 }

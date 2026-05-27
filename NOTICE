@@ -2,3 +2,8 @@ Diligent Code Studio Community Edition
 Copyright 2026 Diligent Software Services
 
 This product includes open-source components including Tauri, React, Monaco Editor, and supporting packages.
+
+Open Source Acknowledgments
+---------------------------
+Diligent Code Studio includes an in-app Open Source Credits page that acknowledges the frameworks, libraries, tools, and ecosystems used by or supported in this project. This acknowledgment page is not a replacement for dependency license review or required third-party notices.
+

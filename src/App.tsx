@@ -15,6 +15,7 @@ import {
   FolderOpen,
   FolderPlus,
   GitBranch,
+  Globe2,
   Hash,
   LayoutTemplate,
   Maximize2,
@@ -127,13 +128,15 @@ type QuickCommand = {
   className?: string;
 };
 
-type WorkspacePage = 'templates' | 'setup' | 'editor' | 'ai' | 'findsearch' | 'terminal' | 'git' | 'problems' | 'release' | 'registry' | 'project' | 'logs' | 'settings';
+type WorkspacePage = 'templates' | 'start' | 'web' | 'setup' | 'editor' | 'ai' | 'findsearch' | 'terminal' | 'git' | 'problems' | 'release' | 'registry' | 'project' | 'logs' | 'credits' | 'settings';
+type BottomPanelTab = 'terminal' | 'problems' | 'output' | 'build' | 'aiLog';
 type MenuDropPlacement = 'before' | 'after';
 
 type ThemePreference = 'dark' | 'midnight' | 'light';
 type TerminalShellPreference = 'auto' | 'powershell' | 'pwsh' | 'cmd' | 'bash' | 'zsh';
+type InterfaceModePreference = 'beginner' | 'advanced';
 type AiProviderPreference = 'disabled' | 'openai' | 'ollama';
-type AiContextPreference = 'selection' | 'currentFile' | 'problems' | 'terminal' | 'git';
+type AiContextPreference = 'selection' | 'currentFile' | 'project' | 'problems' | 'terminal' | 'git';
 
 type AppPreferences = {
   theme: ThemePreference;
@@ -157,14 +160,63 @@ type AppPreferences = {
   aiRequireConfirmation: boolean;
   aiDefaultContext: AiContextPreference;
   compactMode: boolean;
+  interfaceMode: InterfaceModePreference;
   menuPageOrder: WorkspacePage[];
 };
 
 const PREFERENCES_STORAGE_KEY = 'diligent-code-studio.preferences.v1';
+const ONBOARDING_STORAGE_KEY = 'diligent-code-studio.onboarding.v1';
+const AI_HELP_POSITION_STORAGE_KEY = 'diligent-code-studio.ai-help-position.v1';
+const USER_MANUAL_PATH = '/manuals/DiligentCodeStudio_UserManual.pdf';
+
+type FloatingPanelPosition = {
+  left: number;
+  top: number;
+};
+
+function defaultAiHelpPosition(): FloatingPanelPosition {
+  if (typeof window === 'undefined') return { left: 900, top: 72 };
+  return {
+    left: Math.max(16, window.innerWidth - 396),
+    top: 72,
+  };
+}
+
+function clampFloatingPanelPosition(position: FloatingPanelPosition, width = 380, height = 460): FloatingPanelPosition {
+  if (typeof window === 'undefined') return position;
+  const margin = 12;
+  const maxLeft = Math.max(margin, window.innerWidth - width - margin);
+  const maxTop = Math.max(margin, window.innerHeight - height - margin);
+  return {
+    left: Math.min(Math.max(position.left, margin), maxLeft),
+    top: Math.min(Math.max(position.top, margin), maxTop),
+  };
+}
+
+function loadAiHelpPosition(): FloatingPanelPosition {
+  try {
+    const raw = window.localStorage.getItem(AI_HELP_POSITION_STORAGE_KEY);
+    if (!raw) return defaultAiHelpPosition();
+    const parsed = JSON.parse(raw) as Partial<FloatingPanelPosition>;
+    if (typeof parsed.left !== 'number' || typeof parsed.top !== 'number') return defaultAiHelpPosition();
+    return clampFloatingPanelPosition({ left: parsed.left, top: parsed.top });
+  } catch {
+    return defaultAiHelpPosition();
+  }
+}
+
+function saveAiHelpPosition(position: FloatingPanelPosition): void {
+  try {
+    window.localStorage.setItem(AI_HELP_POSITION_STORAGE_KEY, JSON.stringify(position));
+  } catch {
+    // Position persistence is convenience-only. Ignore storage failures.
+  }
+}
 
 const DEFAULT_PAGE_ORDER: WorkspacePage[] = [
   'templates',
-  'setup',
+  'start',
+  'web',
   'editor',
   'ai',
   'findsearch',
@@ -175,6 +227,7 @@ const DEFAULT_PAGE_ORDER: WorkspacePage[] = [
   'registry',
   'project',
   'logs',
+  'credits',
   'settings',
 ];
 
@@ -188,10 +241,13 @@ function workspacePageLabel(page: WorkspacePage): string {
     case 'problems': return 'Problems';
     case 'release': return 'Release';
     case 'templates': return 'Templates';
-    case 'setup': return 'Setup';
-    case 'registry': return 'Registry';
-    case 'project': return 'Tools';
+    case 'start': return 'Start Here';
+    case 'web': return 'Web Builder';
+    case 'setup': return 'Setup & Dependencies';
+    case 'registry': return 'Tool Registry';
+    case 'project': return 'Project Dashboard';
     case 'logs': return 'Logs';
+    case 'credits': return 'Open Source Credits';
     case 'settings': return 'Settings';
     default: return String(page);
   }
@@ -202,6 +258,9 @@ function normalizePageOrder(value: unknown): WorkspacePage[] {
   const ordered: WorkspacePage[] = [];
 
   for (const item of requested) {
+    // Setup & Dependencies remains available from the top-right Setup button,
+    // but it is intentionally excluded from the main Workspace Menu to save room.
+    if (item === 'setup') continue;
     if (isWorkspacePage(item) && !ordered.includes(item)) {
       ordered.push(item);
     }
@@ -227,7 +286,7 @@ const DEFAULT_PREFERENCES: AppPreferences = {
   openWorkspaceOnStartup: false,
   lastWorkspacePath: 'C:\\DiligentProjects',
   rememberLastActivePage: true,
-  lastActivePage: 'editor',
+  lastActivePage: 'start',
   rememberExpandedFolders: true,
   terminalShell: 'auto',
   aiProvider: 'disabled',
@@ -238,6 +297,7 @@ const DEFAULT_PREFERENCES: AppPreferences = {
   aiRequireConfirmation: true,
   aiDefaultContext: 'selection',
   compactMode: false,
+  interfaceMode: 'beginner',
   menuPageOrder: DEFAULT_PAGE_ORDER,
 };
 
@@ -250,12 +310,12 @@ function clampNumber(value: unknown, fallback: number, min: number, max: number)
 function normalizeWorkspacePage(value: unknown): WorkspacePage {
   const page = String(value);
   if (page === 'find' || page === 'search' || page === 'findsearch') return 'findsearch';
-  if (['editor', 'ai', 'terminal', 'git', 'problems', 'release', 'templates', 'setup', 'registry', 'project', 'logs', 'settings'].includes(page)) return page as WorkspacePage;
+  if (['editor', 'ai', 'terminal', 'git', 'problems', 'release', 'templates', 'start', 'web', 'setup', 'registry', 'project', 'logs', 'credits', 'settings'].includes(page)) return page as WorkspacePage;
   return DEFAULT_PREFERENCES.lastActivePage;
 }
 
 function isWorkspacePage(value: unknown): value is WorkspacePage {
-  return ['editor', 'ai', 'findsearch', 'terminal', 'git', 'problems', 'release', 'templates', 'setup', 'registry', 'project', 'logs', 'settings'].includes(String(value));
+  return ['editor', 'ai', 'findsearch', 'terminal', 'git', 'problems', 'release', 'templates', 'start', 'web', 'setup', 'registry', 'project', 'logs', 'credits', 'settings'].includes(String(value));
 }
 
 function loadPreferences(): AppPreferences {
@@ -267,7 +327,8 @@ function loadPreferences(): AppPreferences {
     const theme = ['dark', 'midnight', 'light'].includes(String(parsed.theme)) ? parsed.theme as ThemePreference : DEFAULT_PREFERENCES.theme;
     const terminalShell = ['auto', 'powershell', 'pwsh', 'cmd', 'bash', 'zsh'].includes(String(parsed.terminalShell)) ? parsed.terminalShell as TerminalShellPreference : DEFAULT_PREFERENCES.terminalShell;
     const aiProvider = ['disabled', 'openai', 'ollama'].includes(String(parsed.aiProvider)) ? parsed.aiProvider as AiProviderPreference : DEFAULT_PREFERENCES.aiProvider;
-    const aiDefaultContext = ['selection', 'currentFile', 'problems', 'terminal', 'git'].includes(String(parsed.aiDefaultContext)) ? parsed.aiDefaultContext as AiContextPreference : DEFAULT_PREFERENCES.aiDefaultContext;
+    const aiDefaultContext = ['selection', 'currentFile', 'project', 'problems', 'terminal', 'git'].includes(String(parsed.aiDefaultContext)) ? parsed.aiDefaultContext as AiContextPreference : DEFAULT_PREFERENCES.aiDefaultContext;
+    const interfaceMode = ['beginner', 'advanced'].includes(String((parsed as Partial<AppPreferences>).interfaceMode)) ? (parsed as Partial<AppPreferences>).interfaceMode as InterfaceModePreference : DEFAULT_PREFERENCES.interfaceMode;
     const menuPageOrder = normalizePageOrder(parsed.menuPageOrder);
 
     return {
@@ -277,20 +338,31 @@ function loadPreferences(): AppPreferences {
       terminalShell,
       aiProvider,
       aiDefaultContext,
+      interfaceMode,
       menuPageOrder,
       editorFontSize: clampNumber(parsed.editorFontSize, DEFAULT_PREFERENCES.editorFontSize, 10, 28),
       autoSaveDelaySeconds: clampNumber(parsed.autoSaveDelaySeconds, DEFAULT_PREFERENCES.autoSaveDelaySeconds, 1, 30),
       lastActivePage: normalizeWorkspacePage(parsed.lastActivePage),
       defaultWorkspacePath: parsed.defaultWorkspacePath?.trim() || DEFAULT_PREFERENCES.defaultWorkspacePath,
       lastWorkspacePath: parsed.lastWorkspacePath?.trim() || parsed.defaultWorkspacePath?.trim() || DEFAULT_PREFERENCES.lastWorkspacePath,
+      // Security: API keys are session-only. Older saved keys are intentionally ignored.
+      aiOpenAiApiKey: '',
     };
   } catch {
     return DEFAULT_PREFERENCES;
   }
 }
 
+function redactSensitivePreferences(preferences: AppPreferences): AppPreferences {
+  return {
+    ...preferences,
+    // Security: do not persist API keys or secrets in browser/local storage.
+    aiOpenAiApiKey: '',
+  };
+}
+
 function savePreferences(preferences: AppPreferences) {
-  window.localStorage.setItem(PREFERENCES_STORAGE_KEY, JSON.stringify(preferences, null, 2));
+  window.localStorage.setItem(PREFERENCES_STORAGE_KEY, JSON.stringify(redactSensitivePreferences(preferences), null, 2));
 }
 
 
@@ -321,6 +393,51 @@ const DEFAULT_TOOL_REGISTRY: ToolRegistryItem[] = [
     category: 'Node / Web',
     command: 'npm run build',
     description: 'Run the configured npm build script.',
+    enabled: true,
+    builtIn: true,
+  },
+  {
+    id: 'tool-vite-dev-local',
+    name: 'Vite Local Preview',
+    category: 'Web Builder',
+    command: 'npm run dev -- --host 127.0.0.1',
+    description: 'Host a Vite/React site locally for development on this computer.',
+    enabled: true,
+    builtIn: true,
+  },
+  {
+    id: 'tool-vite-dev-lan',
+    name: 'Vite LAN Preview',
+    category: 'Web Builder',
+    command: 'npm run dev -- --host 0.0.0.0',
+    description: 'Host a local preview on your network so another device can test it.',
+    enabled: true,
+    builtIn: true,
+  },
+  {
+    id: 'tool-vite-preview',
+    name: 'Vite Production Preview',
+    category: 'Web Builder',
+    command: 'npm run preview -- --host 127.0.0.1',
+    description: 'Preview the production build locally after npm run build.',
+    enabled: true,
+    builtIn: true,
+  },
+  {
+    id: 'tool-vercel-deploy',
+    name: 'Vercel Deploy',
+    category: 'Web Deployment',
+    command: 'npx vercel',
+    description: 'Deploy a web project to Vercel using the official CLI workflow.',
+    enabled: true,
+    builtIn: true,
+  },
+  {
+    id: 'tool-netlify-deploy',
+    name: 'Netlify Deploy Preview',
+    category: 'Web Deployment',
+    command: 'npx netlify-cli deploy',
+    description: 'Create a Netlify deploy preview from the active web project.',
     enabled: true,
     builtIn: true,
   },
@@ -535,6 +652,50 @@ function findMatchesInText(
   return matches;
 }
 
+
+type OpenSourceCredit = {
+  name: string;
+  category: string;
+  role: string;
+  website: string;
+};
+
+const OPEN_SOURCE_CREDITS: OpenSourceCredit[] = [
+  { name: 'React', category: 'Frontend Framework', role: 'User interface foundation for the application shell and workspace pages.', website: 'https://react.dev/' },
+  { name: 'React DOM', category: 'Frontend Framework', role: 'Renders the React interface into the desktop webview.', website: 'https://react.dev/reference/react-dom' },
+  { name: 'Vite', category: 'Frontend Build Tool', role: 'Fast frontend dev server and production build pipeline.', website: 'https://vite.dev/' },
+  { name: 'TypeScript', category: 'Language / Type Safety', role: 'Type checking and safer JavaScript application development.', website: 'https://www.typescriptlang.org/' },
+  { name: 'Monaco Editor', category: 'Editor Component', role: 'Code editor engine used for the main editing experience.', website: 'https://microsoft.github.io/monaco-editor/' },
+  { name: '@monaco-editor/react', category: 'Editor Component', role: 'React integration wrapper for Monaco Editor.', website: 'https://github.com/suren-atoyan/monaco-react' },
+  { name: 'Lucide', category: 'Icon Library', role: 'Clean open-source icon set used throughout the interface.', website: 'https://lucide.dev/' },
+  { name: 'Tauri', category: 'Desktop App Framework', role: 'Rust-backed desktop application framework for packaging the app.', website: 'https://tauri.app/' },
+  { name: '@tauri-apps/api', category: 'Desktop App Framework', role: 'Frontend bridge used to call safe native backend commands.', website: 'https://tauri.app/reference/javascript/api/' },
+  { name: 'Tauri CLI', category: 'Desktop Build Tool', role: 'Native app build, development, and bundling workflow.', website: 'https://tauri.app/reference/cli/' },
+  { name: 'Rust', category: 'Language / Backend', role: 'Native backend language used for file operations, command execution, and packaging support.', website: 'https://www.rust-lang.org/' },
+  { name: 'Cargo', category: 'Rust Build Tool', role: 'Rust package manager and build system used by the Tauri backend.', website: 'https://doc.rust-lang.org/cargo/' },
+  { name: 'Serde', category: 'Rust Library', role: 'Serialization and deserialization support for Rust data structures.', website: 'https://serde.rs/' },
+  { name: 'serde_json', category: 'Rust Library', role: 'JSON serialization support for backend commands and responses.', website: 'https://github.com/serde-rs/json' },
+  { name: 'sha2', category: 'Rust Library', role: 'SHA-256 hashing support used for file checksum features.', website: 'https://github.com/RustCrypto/hashes' },
+  { name: 'hex', category: 'Rust Library', role: 'Hex encoding support for generated hashes.', website: 'https://github.com/KokaKiwi/rust-hex' },
+  { name: 'rfd', category: 'Rust Library', role: 'Native file and folder dialogs.', website: 'https://github.com/PolyMeilex/rfd' },
+  { name: 'reqwest', category: 'Rust Library', role: 'HTTP client support for AI and local service checks.', website: 'https://github.com/seanmonstar/reqwest' },
+  { name: 'rustls', category: 'Rust Library', role: 'TLS support used through the Rust HTTP stack.', website: 'https://github.com/rustls/rustls' },
+  { name: 'Node.js', category: 'Runtime / Tooling', role: 'JavaScript runtime used for frontend development and package scripts.', website: 'https://nodejs.org/' },
+  { name: 'npm', category: 'Package Manager', role: 'JavaScript dependency installation and script runner.', website: 'https://www.npmjs.com/' },
+  { name: 'Git', category: 'Source Control', role: 'Version control support and project history management.', website: 'https://git-scm.com/' },
+  { name: 'GitHub CLI', category: 'Source Control', role: 'GitHub login, repository, and release workflow support.', website: 'https://cli.github.com/' },
+  { name: 'Ollama', category: 'Local AI', role: 'Optional local AI model hosting for privacy-friendly assistant workflows.', website: 'https://ollama.com/' },
+  { name: 'Tailwind CSS', category: 'Web Builder Tool', role: 'Supported installable utility-first CSS framework for generated web projects.', website: 'https://tailwindcss.com/' },
+  { name: 'Bootstrap', category: 'Web Builder Tool', role: 'Supported installable CSS and component framework for web projects.', website: 'https://getbootstrap.com/' },
+  { name: 'React Router', category: 'Web Builder Tool', role: 'Supported installable routing library for React website projects.', website: 'https://reactrouter.com/' },
+  { name: 'Framer Motion', category: 'Web Builder Tool', role: 'Supported installable animation library for web interfaces.', website: 'https://motion.dev/' },
+  { name: 'Recharts', category: 'Web Builder Tool', role: 'Supported installable React charting library.', website: 'https://recharts.org/' },
+  { name: 'ESLint', category: 'Quality Tool', role: 'Supported linting tool for JavaScript and TypeScript projects.', website: 'https://eslint.org/' },
+  { name: 'Prettier', category: 'Quality Tool', role: 'Supported formatting tool for consistent project style.', website: 'https://prettier.io/' },
+  { name: 'Vercel CLI', category: 'Deployment Tool', role: 'Supported global web deployment workflow for Vercel projects.', website: 'https://vercel.com/docs/cli' },
+  { name: 'Netlify CLI', category: 'Deployment Tool', role: 'Supported global web deployment workflow for Netlify projects.', website: 'https://docs.netlify.com/cli/get-started/' },
+];
+
 export default function App() {
   const editorRef = useRef<any>(null);
   const terminalOutputRef = useRef<HTMLPreElement | null>(null);
@@ -567,11 +728,11 @@ export default function App() {
   const [toolStatuses, setToolStatuses] = useState<ToolStatus[]>([]);
   const [platformInfo, setPlatformInfo] = useState<PlatformInfo | null>(null);
   const [activity, setActivity] = useState<ActivityItem[]>([
-    { at: nowStamp(), level: 'info', message: 'Diligent Code Studio v0.4.9 loaded with draggable workspace menu and build hardening.' },
+    { at: nowStamp(), level: 'info', message: 'Diligent Code Studio v0.6.9 loaded. Setup & Dependencies remains in the top-right controls and is no longer duplicated in the Workspace Menu.' },
   ]);
   const [terminalCommand, setTerminalCommand] = useState('git status');
   const [terminalOutput, setTerminalOutput] = useState(
-    'Diligent Terminal ready. Version 0.4.9 includes drag-and-drop workspace menu ordering and hardened build settings.\n',
+    'Diligent Terminal ready. Version 0.6.0 keeps Terminal on the dedicated Terminal page and adds project-aware AI Help access.\n',
   );
   const [terminalRunning, setTerminalRunning] = useState(false);
   const [terminalCollapsed, setTerminalCollapsed] = useState(false);
@@ -587,6 +748,7 @@ export default function App() {
   const [findWholeWord, setFindWholeWord] = useState(false);
   const [activeFindIndex, setActiveFindIndex] = useState(0);
   const [activePage, setActivePage] = useState<WorkspacePage>(() => loadPreferences().rememberLastActivePage ? loadPreferences().lastActivePage : 'editor');
+  const [bottomPanelTab, setBottomPanelTab] = useState<BottomPanelTab>('terminal');
   const [findSearchMode, setFindSearchMode] = useState<'current' | 'workspace'>('current');
   const [gitStatus, setGitStatus] = useState<GitStatusInfo | null>(null);
   const [gitLoading, setGitLoading] = useState(false);
@@ -615,10 +777,24 @@ export default function App() {
   const [registryDraft, setRegistryDraft] = useState<ToolRegistryItem>(() => newCustomRegistryDraft());
 
   const [aiPrompt, setAiPrompt] = useState('Explain what this code does and point out any risky areas.');
-  const [aiResponse, setAiResponse] = useState('AI Assistant ready. Configure OpenAI or Ollama in Settings, then ask about selected code, the current file, diagnostics, terminal output, or Git status.\n');
+  const [aiResponse, setAiResponse] = useState('AI Coding Assistant ready. Configure OpenAI or Ollama in Settings, then ask about the whole project, current file, selected code, diagnostics, terminal output, Git status, README files, installer scripts, or missing files.\n');
+  const [aiHelpPrompt, setAiHelpPrompt] = useState('How do I use this screen?');
+  const [aiHelpResponse, setAiHelpResponse] = useState('AI Help is minimized by default. Open it from the upper-right AI Help button for navigation help and quick questions. Full coding responses appear in the AI Coding Assistant window.\n');
   const [aiContextMode, setAiContextMode] = useState<AiContextPreference>(() => loadPreferences().aiDefaultContext);
   const [aiBusy, setAiBusy] = useState(false);
-  const [aiDockOpen, setAiDockOpen] = useState(true);
+  const [aiDockOpen, setAiDockOpen] = useState(false);
+  const [aiHelpPosition, setAiHelpPosition] = useState<FloatingPanelPosition>(() => loadAiHelpPosition());
+  const [aiHelpDragging, setAiHelpDragging] = useState(false);
+  const aiHelpDragRef = useRef<{ pointerId: number; startX: number; startY: number; startLeft: number; startTop: number; width: number; height: number } | null>(null);
+  const assistantPocketRef = useRef<HTMLElement | null>(null);
+  const [helpManualOpen, setHelpManualOpen] = useState(false);
+  const [onboardingOpen, setOnboardingOpen] = useState(() => {
+    try {
+      return window.localStorage.getItem(ONBOARDING_STORAGE_KEY) !== 'completed';
+    } catch {
+      return true;
+    }
+  });
   const [ollamaModels, setOllamaModels] = useState<OllamaModelInfo[]>([]);
   const [ollamaModelsLoading, setOllamaModelsLoading] = useState(false);
   const [ollamaModelsError, setOllamaModelsError] = useState('');
@@ -626,7 +802,7 @@ export default function App() {
   const [setupDependencies, setSetupDependencies] = useState<SetupDependency[]>([]);
   const [setupLoading, setSetupLoading] = useState(false);
   const [setupInstallBusyId, setSetupInstallBusyId] = useState('');
-  const [setupOutput, setSetupOutput] = useState('Dependency Setup Center ready. Use Check Again to refresh installed tools. Installer buttons ask for confirmation first.\n');
+  const [setupOutput, setSetupOutput] = useState('Setup & Dependencies ready. Use Check Again to refresh installed tools. Installer buttons ask for confirmation first.\n');
 
 
   const activeFile = useMemo(
@@ -674,6 +850,8 @@ export default function App() {
     return { builtIn, custom, enabled, total: toolRegistryItems.length };
   }, [toolRegistryItems]);
 
+
+
   const setupCategories = useMemo(() => {
     const categories: Record<string, SetupDependency[]> = {};
     for (const item of setupDependencies) {
@@ -697,6 +875,106 @@ export default function App() {
 
   const npmCommand = platformInfo?.npm_command || 'npm';
   const isWindowsPlatform = !platformInfo || platformInfo.os === 'windows';
+
+  const webBuilderActions = useMemo(() => [
+    {
+      title: 'Local dev server',
+      mode: 'Local',
+      command: `${npmCommand} run dev -- --host 127.0.0.1`,
+      description: 'Runs the project development server only on this computer. Best for normal editing and live preview.',
+    },
+    {
+      title: 'LAN preview server',
+      mode: 'Local network',
+      command: `${npmCommand} run dev -- --host 0.0.0.0`,
+      description: 'Runs the dev server on your local network so phones or another PC can test the site.',
+    },
+    {
+      title: 'Production build',
+      mode: 'Build',
+      command: `${npmCommand} run build`,
+      description: 'Creates optimized static files in dist/ for deployment or production preview.',
+    },
+    {
+      title: 'Production preview',
+      mode: 'Local',
+      command: `${npmCommand} run preview -- --host 127.0.0.1`,
+      description: 'Serves the production dist/ build locally so you can test the final output.',
+    },
+    {
+      title: 'Vercel preview deploy',
+      mode: 'Global',
+      command: 'npx vercel',
+      description: 'Deploys a preview using Vercel CLI. Requires Vercel login and project linking.',
+    },
+    {
+      title: 'Vercel production deploy',
+      mode: 'Global',
+      command: 'npx vercel --prod',
+      description: 'Deploys the current web project to production on Vercel.',
+    },
+    {
+      title: 'Netlify preview deploy',
+      mode: 'Global',
+      command: 'npx netlify-cli deploy',
+      description: 'Creates a Netlify deploy preview. Requires Netlify login/linking.',
+    },
+    {
+      title: 'Netlify production deploy',
+      mode: 'Global',
+      command: 'npx netlify-cli deploy --prod',
+      description: 'Deploys the current web project to production on Netlify.',
+    },
+  ], [npmCommand]);
+
+  const webComponentActions = useMemo(() => [
+    {
+      name: 'React Router',
+      command: `${npmCommand} install react-router-dom`,
+      description: 'Client-side page routing for React web apps.',
+    },
+    {
+      name: 'Tailwind CSS',
+      command: `${npmCommand} install -D tailwindcss @tailwindcss/vite`,
+      description: 'Utility-first CSS framework for modern responsive web design.',
+    },
+    {
+      name: 'Bootstrap',
+      command: `${npmCommand} install bootstrap`,
+      description: 'Popular component and layout CSS toolkit.',
+    },
+    {
+      name: 'Lucide Icons',
+      command: `${npmCommand} install lucide-react`,
+      description: 'Clean SVG icon set for React interfaces.',
+    },
+    {
+      name: 'Framer Motion',
+      command: `${npmCommand} install framer-motion`,
+      description: 'Animation library for polished web interactions.',
+    },
+    {
+      name: 'Recharts',
+      command: `${npmCommand} install recharts`,
+      description: 'Charts and dashboards for React web projects.',
+    },
+    {
+      name: 'ESLint + Prettier',
+      command: `${npmCommand} install -D eslint prettier`,
+      description: 'Code quality and formatting tools for web projects.',
+    },
+    {
+      name: 'Vercel CLI',
+      command: `${npmCommand} install -g vercel`,
+      description: 'Global deployment CLI for Vercel hosting.',
+    },
+    {
+      name: 'Netlify CLI',
+      command: `${npmCommand} install -g netlify-cli`,
+      description: 'Global deployment CLI for Netlify hosting.',
+    },
+  ], [npmCommand]);
+
 
   function shellLabel(value: TerminalShellPreference): string {
     switch (value) {
@@ -764,10 +1042,13 @@ export default function App() {
       case 'problems': return 'Problems / Diagnostics';
       case 'release': return 'Release Builder';
       case 'templates': return 'Project Templates';
-      case 'setup': return 'Dependency Setup Center';
-      case 'registry': return 'Extension / Tools Registry';
-      case 'project': return 'Project / Tools';
+      case 'start': return 'Start Here';
+      case 'web': return 'Web Builder';
+      case 'setup': return 'Setup & Dependencies';
+      case 'registry': return 'Tool Registry';
+      case 'project': return 'Project Health Dashboard';
       case 'logs': return 'Activity Logs';
+      case 'credits': return 'Open Source Credits';
       case 'settings': return 'Settings / Preferences';
       default: return 'Diligent Code Studio';
     }
@@ -775,7 +1056,8 @@ export default function App() {
 
   useEffect(() => {
     refreshPlatformInfo();
-    refreshToolStatus();
+    // Tool checks are intentionally manual/on-demand.
+    // Running npm/git/gh version checks at startup can cause a console/npm window to appear on Windows.
     if (!startupLoadedRef.current && preferences.openWorkspaceOnStartup) {
       startupLoadedRef.current = true;
       const startupPath = workspaceFromPreferences(preferences);
@@ -1081,13 +1363,158 @@ export default function App() {
       case 'problems': return <AlertTriangle size={14} />;
       case 'release': return <PackageCheck size={14} />;
       case 'templates': return <LayoutTemplate size={14} />;
+      case 'start': return <Rocket size={14} />;
+      case 'web': return <Globe2 size={14} />;
       case 'setup': return <PackageCheck size={14} />;
       case 'registry': return <Wrench size={14} />;
       case 'project': return <PackageCheck size={14} />;
       case 'logs': return <AlertTriangle size={14} />;
+      case 'credits': return <ExternalLink size={14} />;
       case 'settings': return <SlidersHorizontal size={14} />;
       default: return <FileCode2 size={14} />;
     }
+  }
+
+
+  function pageGuide(page: WorkspacePage) {
+    switch (page) {
+      case 'start':
+        return {
+          title: 'Start Here',
+          summary: 'Use this dashboard when you are not sure where to begin. It points you to setup, projects, AI help, web building, and release packaging.',
+          nextStep: workspacePath.trim() ? 'Open or create a file, then use AI Coding Assistant to review the project.' : 'Choose a workspace folder or create a sample project from Templates.',
+          prompt: 'Guide me through the Start Here dashboard and recommend the next best step for my current workspace.',
+        };
+      case 'templates':
+        return {
+          title: 'Project Templates',
+          summary: 'Create sample projects and starter structures so a new user can learn by clicking something that works.',
+          nextStep: 'Pick a template, choose a parent folder, create the project, then open the new folder as your workspace.',
+          prompt: 'Help me choose the best project template and explain what each template is used for.',
+        };
+      case 'web':
+        return {
+          title: 'Web Builder',
+          summary: 'Build websites, preview them locally, test them on your LAN, and prepare global deployment commands.',
+          nextStep: 'Create a web template, run local preview, then use production build before global deployment.',
+          prompt: 'Explain the Web Builder screen and tell me how to host this site locally or globally.',
+        };
+      case 'setup':
+        return {
+          title: 'Setup & Dependencies',
+          summary: 'Check whether this computer has the tools needed for coding, AI, Git, websites, installers, and desktop builds.',
+          nextStep: 'Click Check Again, then install only the missing tools you actually need for your project type.',
+          prompt: 'Explain which setup dependencies I need for this project and what I should install next.',
+        };
+      case 'editor':
+        return {
+          title: 'Editor',
+          summary: 'Open, edit, save, format, and hash files from the selected workspace.',
+          nextStep: activeFile ? 'Edit the active file, save it, then ask AI to explain or improve it.' : 'Choose a file from the left project tree or create a new file.',
+          prompt: 'Explain how to use the Editor screen and what I should do with the current file.',
+        };
+      case 'ai':
+        return {
+          title: 'AI Coding Assistant',
+          summary: 'Use this workspace for project-aware coding help, code reviews, bug finding, README generation, and installer script guidance.',
+          nextStep: 'Choose Project context for broad help or Current File context for code-specific help.',
+          prompt: 'Explain how the AI Coding Assistant should be used with this project.',
+        };
+      case 'findsearch':
+        return {
+          title: 'Find / Search',
+          summary: 'Search inside the current file or across the entire workspace.',
+          nextStep: 'Use workspace search when you need to find where a function, setting, or error message lives.',
+          prompt: 'Explain how to use Find/Search to locate code or project settings.',
+        };
+      case 'terminal':
+        return {
+          title: 'Terminal',
+          summary: 'Run project commands from inside the selected workspace and capture output for troubleshooting.',
+          nextStep: 'Run a safe command like git status, npm run build, or npm run validate depending on your project.',
+          prompt: 'Review the Terminal screen and tell me the safest next command to run for this project.',
+        };
+      case 'git':
+        return {
+          title: 'Git Source Control',
+          summary: 'Check repository status, changed files, commits, tags, remotes, and GitHub readiness.',
+          nextStep: 'Refresh Git status, review changed files, then commit with a clear message.',
+          prompt: 'Explain the Git screen and help me understand the current repository status.',
+        };
+      case 'problems':
+        return {
+          title: 'Problems / Diagnostics',
+          summary: 'Run validation and build checks to catch TypeScript, Vite, Rust, and packaging problems.',
+          nextStep: 'Run diagnostics, then send the output to the AI Coding Assistant for a fix plan.',
+          prompt: 'Explain the Problems screen and help me understand the current diagnostics output.',
+        };
+      case 'release':
+        return {
+          title: 'Release Builder',
+          summary: 'Build, package, checksum, and prepare a release-ready ZIP or installer workflow.',
+          nextStep: 'Validate the project first, then run release packaging and review the output folder.',
+          prompt: 'Explain the Release Builder and help me prepare this project for a clean release.',
+        };
+      case 'registry':
+        return {
+          title: 'Tool Registry',
+          summary: 'Manage reusable commands, web tools, build tools, and project utilities the app can run.',
+          nextStep: 'Enable the tools you use often and add custom commands for your workflow.',
+          prompt: 'Explain the Tool Registry and recommend useful tools for this project.',
+        };
+      case 'project':
+        return {
+          title: 'Project Health Dashboard',
+          summary: 'See detected project type, Git status, platform details, language support, and common next actions.',
+          nextStep: 'Use this page when you want a quick overview before building, debugging, or releasing.',
+          prompt: 'Summarize this Project Health Dashboard and recommend the next best action.',
+        };
+      case 'logs':
+        return {
+          title: 'Activity Logs',
+          summary: 'Review recent actions, warnings, installs, builds, and app-level events.',
+          nextStep: 'Copy logs when asking for troubleshooting help or diagnosing what happened.',
+          prompt: 'Explain the Activity Logs screen and help me interpret recent warnings or errors.',
+        };
+      case 'credits':
+        return {
+          title: 'Open Source Credits',
+          summary: 'Honor the open-source frameworks, libraries, tools, and ecosystems that helped make Diligent Code Studio possible.',
+          nextStep: 'Open a project website to review licenses, documentation, contributors, and community information.',
+          prompt: 'Explain the Open Source Credits screen and why open-source acknowledgments matter for this project.',
+        };
+      case 'settings':
+        return {
+          title: 'Settings / Preferences',
+          summary: 'Control appearance, beginner or advanced mode, AI provider, workspace behavior, terminal shell, and menu order.',
+          nextStep: 'Use Beginner Mode for guidance or Advanced Mode when you want more technical controls.',
+          prompt: 'Explain the Settings screen and recommend safe settings for a new user.',
+        };
+      default:
+        return {
+          title: 'Diligent Code Studio',
+          summary: 'Use this workspace to build, test, troubleshoot, and release software with local-first AI support.',
+          nextStep: 'Open Start Here if you are unsure what to do next.',
+          prompt: 'Guide me through Diligent Code Studio and recommend the next best step.',
+        };
+    }
+  }
+
+  function openGuideForCurrentPage() {
+    const guide = pageGuide(activePage);
+    setAiHelpPrompt(guide.prompt);
+    setAiHelpResponse(`Guide for ${guide.title}\n\nWhat this screen does:\n${guide.summary}\n\nGood next step:\n${guide.nextStep}\n\nYou can press Ask to have AI personalize this guidance using your current screen and workspace context.\n`);
+    setAiDockOpen(true);
+  }
+
+  function completeOnboarding(page?: WorkspacePage) {
+    try {
+      window.localStorage.setItem(ONBOARDING_STORAGE_KEY, 'completed');
+    } catch {
+      // Ignore local storage failures and continue with the selected action.
+    }
+    setOnboardingOpen(false);
+    if (page) activateWorkspacePage(page);
   }
 
 
@@ -1265,6 +1692,16 @@ export default function App() {
       log('info', `Opened ${item.name} website.`);
     } catch (error) {
       log('error', `Could not open ${item.name} website: ${String(error)}`);
+    }
+  }
+
+
+  async function openOpenSourceCredit(credit: OpenSourceCredit) {
+    try {
+      await invoke('open_external_url', { url: credit.website });
+      log('info', `Opened open-source project website: ${credit.name}.`);
+    } catch (error) {
+      log('error', `Could not open ${credit.name} website: ${String(error)}`);
     }
   }
 
@@ -1907,6 +2344,101 @@ ERROR: ${message}
   }
 
 
+  function projectContextText(): string {
+    const fileEntries = entries
+      .filter((entry) => !entry.is_dir)
+      .slice(0, 200)
+      .map((entry) => `- ${entry.relative_path} (${formatSize(entry.size)})`);
+
+    const folderEntries = entries
+      .filter((entry) => entry.is_dir && entry.depth <= 2)
+      .slice(0, 80)
+      .map((entry) => `- ${entry.relative_path}/`);
+
+    const openFileSummary = openFiles.map((file) => `- ${file.name} | ${file.language} | ${file.dirty ? 'unsaved changes' : 'saved'} | ${file.path}`);
+
+    const projectSummary = projectInfo
+      ? [
+          `Detected project path: ${projectInfo.path}`,
+          `Project types: ${projectInfo.project_types.join(', ') || 'Unknown'}`,
+          `package.json: ${projectInfo.has_package_json ? 'yes' : 'no'}`,
+          `Cargo.toml: ${projectInfo.has_cargo_toml ? 'yes' : 'no'}`,
+          `Tauri project: ${projectInfo.has_tauri_project ? 'yes' : 'no'}`,
+          `C# solution: ${projectInfo.has_solution ? 'yes' : 'no'}`,
+          `C# project: ${projectInfo.has_csproj ? 'yes' : 'no'}`,
+          `PowerShell scripts: ${projectInfo.has_powershell_scripts ? 'yes' : 'no'}`,
+          `Git repository: ${projectInfo.has_git_repository ? 'yes' : 'no'}`,
+          projectInfo.cargo_working_directory ? `Cargo working directory: ${projectInfo.cargo_working_directory}` : '',
+          projectInfo.recommended_commands.length > 0 ? `Recommended commands:\n${projectInfo.recommended_commands.map((cmd) => `- ${cmd}`).join('\n')}` : '',
+          projectInfo.warnings.length > 0 ? `Project warnings:\n${projectInfo.warnings.map((warning) => `- ${warning}`).join('\n')}` : '',
+        ].filter(Boolean).join('\n')
+      : 'No project has been detected yet.';
+
+    const gitSummary = gitStatus
+      ? [
+          `Git root: ${gitStatus.git_root}`,
+          `Branch: ${gitStatus.branch}`,
+          `Ahead/behind: ${gitStatus.ahead_behind || 'none'}`,
+          `Clean: ${gitStatus.clean ? 'yes' : 'no'}`,
+          gitStatus.changed_files.length > 0 ? `Changed files:\n${gitStatus.changed_files.slice(0, 80).map((file) => `- ${file.status} ${file.path}${file.staged ? ' [staged]' : ''}${file.unstaged ? ' [unstaged]' : ''}`).join('\n')}` : 'Changed files: none',
+          gitStatus.recent_commits.length > 0 ? `Recent commits:\n${gitStatus.recent_commits.slice(0, 8).map((commit) => `- ${commit.hash} ${commit.message}`).join('\n')}` : '',
+        ].filter(Boolean).join('\n')
+      : 'Git status has not been loaded.';
+
+    const diagnosticsSummary = diagnostics
+      ? [
+          `Diagnostics exit code: ${diagnostics.exit_code}`,
+          `Problems: ${diagnostics.problem_count} total, ${diagnostics.error_count} errors, ${diagnostics.warning_count} warnings`,
+          diagnostics.problems.length > 0 ? `Top problems:\n${diagnostics.problems.slice(0, 30).map((problem) => `- ${problem.severity.toUpperCase()} ${problem.relative_path || problem.file_path}:${problem.line_number || 1}:${problem.column || 1} ${problem.message}`).join('\n')}` : 'Top problems: none',
+        ].join('\n')
+      : 'Diagnostics have not been run.';
+
+    const releaseSummary = releaseInfo
+      ? [
+          `Release app version: ${releaseInfo.app_version || 'unknown'}`,
+          `Tauri config: ${releaseInfo.has_tauri_config ? 'yes' : 'no'}`,
+          `Bundle artifacts: ${releaseInfo.has_bundle_artifacts ? 'yes' : 'no'}`,
+          `Bundle directory: ${releaseInfo.bundle_directory || 'not found'}`,
+          `Release root: ${releaseInfo.release_root || 'not set'}`,
+          `Artifact count: ${releaseInfo.artifact_count}`,
+          releaseInfo.warnings.length > 0 ? `Release warnings:\n${releaseInfo.warnings.map((warning) => `- ${warning}`).join('\n')}` : '',
+        ].filter(Boolean).join('\n')
+      : 'Release information has not been loaded.';
+
+    return [
+      `Active screen: ${activePageTitle}`,
+      `Workspace path: ${workspacePath || 'not selected'}`,
+      '',
+      'PROJECT DETECTION',
+      projectSummary,
+      '',
+      'ACTIVE FILE',
+      activeFile ? `${activeFile.path}\nLanguage: ${formatLanguageLabel(activeFile.language)}\nUnsaved changes: ${activeFile.dirty ? 'yes' : 'no'}\nContent preview:\n${activeFile.content.slice(0, 8000)}` : 'No active file is open.',
+      '',
+      'OPEN FILES',
+      openFileSummary.length > 0 ? openFileSummary.join('\n') : 'No open files.',
+      '',
+      'WORKSPACE FOLDERS',
+      folderEntries.length > 0 ? folderEntries.join('\n') : 'No folders loaded.',
+      '',
+      'WORKSPACE FILES',
+      fileEntries.length > 0 ? fileEntries.join('\n') : 'No files loaded.',
+      '',
+      'GIT STATUS',
+      gitSummary,
+      '',
+      'DIAGNOSTICS',
+      diagnosticsSummary,
+      '',
+      'RECENT TERMINAL OUTPUT',
+      terminalOutput.slice(-6000) || 'No terminal output is available.',
+      '',
+      'RELEASE STATUS',
+      releaseSummary,
+    ].join('\n');
+  }
+
+
   function aiContextText(): string {
     switch (aiContextMode) {
       case 'selection': {
@@ -1917,6 +2449,8 @@ ERROR: ${message}
       }
       case 'currentFile':
         return activeFile ? `Current file ${activeFile.path}:\n\n${activeFile.content}` : 'No active file is open.';
+      case 'project':
+        return projectContextText();
       case 'problems':
         return diagnosticsOutput || 'No diagnostics output is available.';
       case 'terminal':
@@ -1925,6 +2459,39 @@ ERROR: ${message}
         return gitStatus ? JSON.stringify(gitStatus, null, 2) : 'No Git status has been loaded.';
       default:
         return '';
+    }
+  }
+
+  function aiHelpContextText(): string {
+    const projectTypes = projectInfo?.project_types?.join(', ') || 'Unknown';
+    const activeFileLine = activeFile ? `${activeFile.path} (${formatLanguageLabel(activeFile.language)}, ${countLines(activeFile.content)} lines)` : 'No active file';
+    return [
+      `Current screen: ${activePageTitle}`,
+      `Workspace: ${workspacePath || 'No workspace selected'}`,
+      `Detected project type: ${projectTypes}`,
+      `Active file: ${activeFileLine}`,
+      `Open files: ${openFiles.length}`,
+      `Git: ${projectInfo?.has_git_repository ? 'Repository detected' : 'No repository detected'}`,
+      `Setup status: ${setupStats.total > 0 ? `${setupStats.installed}/${setupStats.total} tools detected` : 'Not checked yet'}`,
+      '',
+      'Use AI Help for app navigation and quick guidance. For full coding output, use the AI Coding Assistant workspace page.',
+    ].join('\n');
+  }
+
+  function prepareAiHelpAction(action: string) {
+    switch (action) {
+      case 'navigate':
+        setAiHelpPrompt('Help me understand this screen and what I should click next.');
+        break;
+      case 'project':
+        setAiHelpPrompt('Give me a quick plain-English status summary of this project and what to do next.');
+        break;
+      case 'coding':
+        setAiHelpPrompt('Tell me where to go in Diligent Code Studio for coding help, bug finding, README creation, installer scripts, or project summaries.');
+        break;
+      default:
+        setAiHelpPrompt('How do I use this screen?');
+        break;
     }
   }
 
@@ -1977,8 +2544,62 @@ ERROR: ${message}
         return;
     }
 
-    log('info', `Prepared AI code action: ${action}. Review the prompt, then click Ask AI.`);
+    setActivePage('ai');
+    log('info', `Prepared AI code action: ${action}. Review the prompt in the AI Coding Assistant window, then click Ask AI.`);
   }
+
+  function prepareProjectAiAction(action: string) {
+    const fileName = activeFile?.name ?? 'the current file';
+    const language = activeFile ? formatLanguageLabel(activeFile.language) : 'unknown language';
+    const hasSelection = selectedEditorText().trim().length > 0;
+
+    switch (action) {
+      case 'ask-project':
+        setAiContextMode('project');
+        setAiPrompt('Ask AI about this project. Review the project structure, detected technologies, active file, diagnostics, Git status, terminal output, and release status. Tell me the best next steps and ask for any missing detail only if absolutely necessary.');
+        break;
+      case 'explain-current-file':
+        setAiContextMode('currentFile');
+        setAiPrompt(`Explain ${fileName} (${language}) in plain English. Include its purpose, important functions/components, data flow, dependencies, and where it fits in the project.`);
+        break;
+      case 'find-bugs':
+        setAiContextMode(activeFile ? 'currentFile' : 'project');
+        setAiPrompt(activeFile
+          ? `Find bugs in ${fileName} (${language}). Look for runtime errors, broken UI behavior, async/state issues, edge cases, security concerns, and maintainability problems. Prioritize the fixes and include exact code changes when possible.`
+          : 'Find likely bugs across this project using the available project context, diagnostics, terminal output, Git status, and file tree. Prioritize the fixes and include exact files to inspect first.');
+        break;
+      case 'improve-code':
+        setAiContextMode(hasSelection ? 'selection' : activeFile ? 'currentFile' : 'project');
+        setAiPrompt(hasSelection
+          ? 'Improve this selected code. Make it cleaner, safer, easier to maintain, and more reliable. Explain the changes, then provide a replacement code block.'
+          : activeFile
+            ? `Improve ${fileName} (${language}). Suggest practical refactoring, layout, naming, error handling, and reliability improvements. Include replacement code only for the parts that should change.`
+            : 'Improve this project based on the available project context. Recommend the highest-impact code, layout, build, and reliability improvements.');
+        break;
+      case 'generate-missing-file':
+        setAiContextMode('project');
+        setAiPrompt('Generate a missing file for this project. First identify the most likely missing file based on the project structure, diagnostics, terminal output, and release state. Then provide the exact relative path and complete file contents. If multiple files are needed, list them in the correct creation order.');
+        break;
+      case 'create-readme':
+        setAiContextMode('project');
+        setAiPrompt('Create a professional README.md for this project. Include overview, features, requirements, setup, development commands, build commands, release process, troubleshooting, security/privacy notes, and license/credits placeholders. Return complete Markdown ready to save as README.md.');
+        break;
+      case 'create-installer-script':
+        setAiContextMode('project');
+        setAiPrompt('Create an installer/build script for this project based on the detected technologies. Prefer a Windows PowerShell script if this is a Windows desktop app. Include prerequisite checks, clean build, npm build when needed, Tauri/.NET/Rust build when detected, installer artifact location, SHA-256 checksum generation, and clear success/failure messages. Return the complete script and recommended file path.');
+        break;
+      case 'summarize-project':
+        setAiContextMode('project');
+        setAiPrompt('Summarize this project for a developer who has never seen it. Include project purpose, technology stack, folder/file structure, key entry points, build/release workflow, known problems, next recommended improvements, and any risk areas.');
+        break;
+      default:
+        return;
+    }
+
+    setActivePage('ai');
+    log('info', `Prepared project-aware AI action: ${action}. Review the prompt in the AI Coding Assistant window, then click Ask AI.`);
+  }
+
 
   function aiCommentText(text: string, language?: string): string {
     const cleaned = text.trim();
@@ -2112,6 +2733,66 @@ ERROR: ${message}
     }
   }
 
+  async function askAiHelp() {
+    const prompt = aiHelpPrompt.trim();
+    if (!prompt) {
+      log('warn', 'Type an AI Help prompt first.');
+      return;
+    }
+
+    if (preferences.aiProvider === 'disabled') {
+      setAiHelpResponse('AI Help cannot send a request because AI is disabled. Open Settings and choose OpenAI or Ollama first.\n');
+      setActivePage('settings');
+      log('warn', 'AI provider is disabled. Configure OpenAI or Ollama in Settings first.');
+      return;
+    }
+
+    if (preferences.aiProvider === 'openai' && !preferences.aiOpenAiApiKey.trim()) {
+      setAiHelpResponse('AI Help cannot send a request because the OpenAI API key is missing. Open Settings and enter a session-only API key, or switch to Ollama.\n');
+      setActivePage('settings');
+      log('warn', 'OpenAI API key is required before using the OpenAI provider.');
+      return;
+    }
+
+    const context = aiHelpContextText();
+    if (preferences.aiRequireConfirmation) {
+      const confirmed = window.confirm(`Send this AI Help prompt and screen context to the configured AI provider?\n\nProvider: ${preferences.aiProvider}\nPrompt length: ${prompt.length} characters\nContext length: ${context.length} characters`);
+      if (!confirmed) {
+        log('warn', 'AI Help request cancelled before sending context.');
+        return;
+      }
+    }
+
+    setAiBusy(true);
+    const startedAt = Date.now();
+    setAiHelpResponse(`[${nowStamp()}] AI Help request started...\nProvider: ${preferences.aiProvider}\nContext: Current screen + workspace summary\n`);
+
+    try {
+      const result = await invoke<AiChatResponse>('ai_chat', {
+        provider: preferences.aiProvider,
+        apiKey: preferences.aiOpenAiApiKey,
+        model: preferences.aiProvider === 'openai' ? preferences.aiOpenAiModel : preferences.aiOllamaModel,
+        endpoint: preferences.aiOllamaEndpoint,
+        prompt,
+        context,
+      });
+
+      setAiHelpResponse([
+        `[${nowStamp()}] AI Help response returned after ${elapsedSeconds(startedAt)}s.`,
+        `Provider: ${result.provider}`,
+        `Model: ${result.model}`,
+        '',
+        result.response,
+      ].join('\n'));
+      log('success', `AI Help response received from ${result.provider} using ${result.model}.`);
+    } catch (error) {
+      setAiHelpResponse(`[${nowStamp()}] AI Help request failed after ${elapsedSeconds(startedAt)}s.\nERROR: ${String(error)}\n`);
+      log('error', `AI Help request failed: ${String(error)}`);
+    } finally {
+      setAiBusy(false);
+    }
+  }
+
   function insertAiResponseIntoEditor() {
     if (!activeFile || !aiResponse.trim()) return;
     const editor = editorRef.current;
@@ -2121,6 +2802,40 @@ ERROR: ${message}
       updateActiveContent(`${activeFile.content}\n\n${aiResponse}`);
     }
     log('info', 'Inserted AI response into the active editor. Review before saving.');
+  }
+
+
+  function prepareWebBuilderCommand(command: string) {
+    const target = workspacePath.trim() || terminalCwd.trim();
+    setTerminalCwd(target);
+    setTerminalCommand(command);
+    setActivePage('terminal');
+    appendTerminal(`
+[${nowStamp()}] Web Builder prepared command
+Working directory: ${target || 'Not selected'}
+Command: ${command}
+Click Run in Terminal when ready.
+`);
+    log('info', `Web Builder prepared command: ${command}`);
+  }
+
+  async function runWebBuilderCommand(label: string, command: string) {
+    const target = workspacePath.trim() || terminalCwd.trim();
+    if (!target) {
+      log('warn', 'Choose a workspace before running Web Builder commands.');
+      return;
+    }
+
+    const confirmed = window.confirm(`Run Web Builder command?\n\n${label}\n${command}\n\nSome hosting/deployment CLIs may ask you to sign in or create project links.`);
+    if (!confirmed) {
+      log('warn', `Web Builder command cancelled: ${label}`);
+      return;
+    }
+
+    setTerminalCwd(target);
+    setTerminalCommand(command);
+    setActivePage('terminal');
+    await runTerminalCommand(command, true);
   }
 
   async function runTerminalCommand(command = terminalCommand, force = false) {
@@ -2220,17 +2935,17 @@ ERROR: ${String(error)}
   }
 
   function resetToolRegistry() {
-    const confirmed = window.confirm('Reset the Tools Registry to the built-in defaults? Custom tools will be removed.');
+    const confirmed = window.confirm('Reset the Tool Registry to the built-in defaults? Custom tools will be removed.');
     if (!confirmed) return;
     setToolRegistryItems(DEFAULT_TOOL_REGISTRY);
     setRegistryCategoryFilter('All');
     setRegistryDraft(newCustomRegistryDraft());
-    log('info', 'Tools Registry reset to built-in defaults.');
+    log('info', 'Tool Registry reset to built-in defaults.');
   }
 
   async function runRegistryTool(item: ToolRegistryItem) {
     if (!item.enabled) {
-      log('warn', `Registry tool is disabled: ${item.name}`);
+      log('warn', `Tool Registry item is disabled: ${item.name}`);
       return;
     }
     setActivePage('terminal');
@@ -2576,15 +3291,103 @@ ERROR: ${String(error)}
     }
   }
 
+
+  function beginAiHelpDrag(event: ReactPointerEvent<HTMLDivElement>): void {
+    if (event.button !== 0) return;
+    const target = event.target as HTMLElement | null;
+    if (target?.closest('button, textarea, input, select, a')) return;
+    const panel = assistantPocketRef.current;
+    if (!panel) return;
+    const rect = panel.getBoundingClientRect();
+    const startPosition = clampFloatingPanelPosition({ left: rect.left, top: rect.top }, rect.width, rect.height);
+    aiHelpDragRef.current = {
+      pointerId: event.pointerId,
+      startX: event.clientX,
+      startY: event.clientY,
+      startLeft: startPosition.left,
+      startTop: startPosition.top,
+      width: rect.width,
+      height: rect.height,
+    };
+    setAiHelpDragging(true);
+    setAiHelpPosition(startPosition);
+    event.currentTarget.setPointerCapture(event.pointerId);
+  }
+
+  function moveAiHelpDrag(event: ReactPointerEvent<HTMLDivElement>): void {
+    const drag = aiHelpDragRef.current;
+    if (!drag || drag.pointerId !== event.pointerId) return;
+    const nextPosition = clampFloatingPanelPosition(
+      {
+        left: drag.startLeft + event.clientX - drag.startX,
+        top: drag.startTop + event.clientY - drag.startY,
+      },
+      drag.width,
+      drag.height,
+    );
+    setAiHelpPosition(nextPosition);
+  }
+
+  function endAiHelpDrag(event: ReactPointerEvent<HTMLDivElement>): void {
+    const drag = aiHelpDragRef.current;
+    if (!drag || drag.pointerId !== event.pointerId) return;
+    aiHelpDragRef.current = null;
+    setAiHelpDragging(false);
+    setAiHelpPosition((current) => {
+      const panel = assistantPocketRef.current;
+      const width = panel?.getBoundingClientRect().width ?? drag.width;
+      const height = panel?.getBoundingClientRect().height ?? drag.height;
+      const clamped = clampFloatingPanelPosition(current, width, height);
+      saveAiHelpPosition(clamped);
+      return clamped;
+    });
+    try {
+      event.currentTarget.releasePointerCapture(event.pointerId);
+    } catch {
+      // Pointer capture may already have been released by the browser.
+    }
+  }
+
+  function resetAiHelpPosition(): void {
+    const nextPosition = defaultAiHelpPosition();
+    const panel = assistantPocketRef.current;
+    const rect = panel?.getBoundingClientRect();
+    const clamped = clampFloatingPanelPosition(nextPosition, rect?.width ?? 380, rect?.height ?? 460);
+    setAiHelpPosition(clamped);
+    saveAiHelpPosition(clamped);
+  }
+
   return (
-    <main className={`app-shell theme-${preferences.theme} ${preferences.compactMode ? 'compact-mode' : ''}`}>
+    <main className={`app-shell v050-shell theme-${preferences.theme} ${preferences.compactMode ? 'compact-mode' : ''} mode-${preferences.interfaceMode} ${aiDockOpen ? 'assistant-open' : 'assistant-closed'}`}>
+      <header className="app-top-appbar">
+        <div className="app-top-title">
+          <div className="app-top-logo"><ShieldCheck size={18} /></div>
+          <div>
+            <strong>Diligent Code Studio</strong>
+            <span>Local-first AI development workbench • v0.6.9</span>
+          </div>
+        </div>
+        <div className="app-health-strip" aria-label="Project health summary">
+          <span className={projectInfo ? 'ok' : 'missing'}>{projectInfo ? `Project: ${projectInfo.project_types.join(', ') || 'Detected'}` : 'Project: Not loaded'}</span>
+          <span className={projectInfo?.has_git_repository ? 'ok' : 'missing'}>{projectInfo?.has_git_repository ? 'Git: Ready' : 'Git: Not detected'}</span>
+          <span className={setupStats.missingRequired === 0 && setupStats.total > 0 ? 'ok' : 'missing'}>{setupStats.total > 0 ? `Setup: ${setupStats.installed}/${setupStats.total}` : 'Setup: Check needed'}</span>
+          <span className={preferences.aiProvider !== 'disabled' ? 'ok' : 'missing'}>{preferences.aiProvider !== 'disabled' ? `AI: ${preferences.aiProvider}` : 'AI: Disabled'}</span>
+        </div>
+        <div className="app-top-actions">
+          <button className="secondary-button" onClick={() => setHelpManualOpen(true)} title="Open the built-in PDF user manual"><ExternalLink size={14} /> Manual</button>
+          <button className="secondary-button" onClick={() => setActivePage('setup')}><PackageCheck size={14} /> Setup</button>
+          <button className="secondary-button" onClick={openGuideForCurrentPage}><BrainCircuit size={14} /> Guide Me</button>
+          <button className={`secondary-button ${aiDockOpen ? 'active-toolbar-action' : ''}`} onClick={() => setAiDockOpen((current) => !current)}><Bot size={14} /> {aiDockOpen ? 'Close AI Help' : 'AI Help'}</button>
+        </div>
+      </header>
+
       <aside className="sidebar">
         <div className="brand-block">
           <div className="brand-icon"><ShieldCheck size={24} /></div>
           <div>
             <h1>Diligent Code Studio</h1>
             <p className="brand-tagline">Secure software-building workbench</p>
-            <p>Community Edition v0.3.8</p>
+            <p>Community Edition v0.6.9</p>
           </div>
         </div>
 
@@ -2709,23 +3512,106 @@ ERROR: ${String(error)}
               <button className="toolbar-action" onClick={hashActiveFile} disabled={!activeFile} title="Generate SHA-256 for active file">
                 <Hash size={14} /> <span>SHA</span>
               </button>
-              <button
-                className={`toolbar-action ${aiDockOpen ? 'active-toolbar-action' : ''}`}
-                onClick={() => {
-                  if (activePage !== 'editor') {
-                    setActivePage('editor');
-                    setAiDockOpen(true);
-                  } else {
-                    setAiDockOpen((current) => !current);
-                  }
-                }}
-                title="Show or hide the docked AI assistant on the Editor page"
-              >
-                <Bot size={14} /> <span>{aiDockOpen && activePage === 'editor' ? 'Hide AI' : 'Show AI'}</span>
-              </button>
             </div>
           </div>
         </header>
+
+
+
+        <section className="screen-guide-card" aria-label="Current screen guide">
+          <div className="guide-card-copy">
+            <div className="guide-eyebrow"><BrainCircuit size={14} /> What this page does</div>
+            <h3>{pageGuide(activePage).title}</h3>
+            <p>{pageGuide(activePage).summary}</p>
+            <p className="guide-next"><strong>Good next step:</strong> {pageGuide(activePage).nextStep}</p>
+          </div>
+          <div className="guide-card-actions">
+            <button className="secondary-button" onClick={openGuideForCurrentPage}><Bot size={14} /> Guide Me</button>
+            {preferences.interfaceMode === 'beginner' && <button className="secondary-button" onClick={() => completeOnboarding('start')}><Rocket size={14} /> Start Here</button>}
+          </div>
+        </section>
+
+
+        {activePage === 'start' && (
+          <section className="page-content utility-page start-page">
+            <div className="start-hero panel">
+              <div>
+                <div className="panel-title"><Rocket size={18} /> Start Here</div>
+                <h2>What do you want to do?</h2>
+                <p className="muted-note">Choose a guided path. Diligent Code Studio will move you to the right workspace and show the next step.</p>
+              </div>
+              <button className="secondary-button" onClick={() => setOnboardingOpen(true)}><BrainCircuit size={14} /> Reopen Welcome Wizard</button>
+            </div>
+
+            <div className="start-choice-grid">
+              <button className="start-choice-card" onClick={() => completeOnboarding('templates')}>
+                <LayoutTemplate size={22} />
+                <strong>Build a desktop app</strong>
+                <span>Create or open a project, then use Editor, AI, Terminal, and Release Builder.</span>
+              </button>
+              <button className="start-choice-card" onClick={() => completeOnboarding('web')}>
+                <Globe2 size={22} />
+                <strong>Build a website</strong>
+                <span>Use Web Builder for local preview, LAN hosting, and public deployment helpers.</span>
+              </button>
+              <button className="start-choice-card" onClick={() => completeOnboarding('setup')}>
+                <PackageCheck size={22} />
+                <strong>Set up my computer</strong>
+                <span>Check Node.js, Git, Rust, Tauri, GitHub CLI, web tools, and optional AI tools.</span>
+              </button>
+              <button className="start-choice-card" onClick={() => completeOnboarding('editor')}>
+                <FolderOpen size={22} />
+                <strong>Open an existing project</strong>
+                <span>Choose a workspace folder, browse files, edit code, and save changes.</span>
+              </button>
+              <button className="start-choice-card" onClick={() => completeOnboarding('ai')}>
+                <Bot size={22} />
+                <strong>Use AI to help with code</strong>
+                <span>Ask project-aware questions, find bugs, improve files, or generate missing content.</span>
+              </button>
+              <button className="start-choice-card" onClick={() => completeOnboarding('release')}>
+                <Rocket size={22} />
+                <strong>Create an installer or release</strong>
+                <span>Validate, build, package, checksum, and prepare release notes.</span>
+              </button>
+              <button className="start-choice-card" onClick={() => completeOnboarding('credits')}>
+                <ExternalLink size={22} />
+                <strong>View open-source credits</strong>
+                <span>Recognize the contributors and projects that helped make this software possible.</span>
+              </button>
+            </div>
+
+            <div className="start-steps-grid">
+              <section className="panel">
+                <div className="panel-title"><CheckCircle2 size={16} /> Recommended first workflow</div>
+                <ol className="getting-started-list">
+                  <li><strong>Check Setup & Dependencies</strong><span>Make sure the needed tools are installed.</span></li>
+                  <li><strong>Open or create a project</strong><span>Use Choose Folder or Project Templates.</span></li>
+                  <li><strong>Use AI Help when unsure</strong><span>The upper-right AI Help button explains the current screen.</span></li>
+                  <li><strong>Build and test</strong><span>Use Terminal, Problems, and Project Dashboard.</span></li>
+                  <li><strong>Create a release</strong><span>Use Release Builder when the project is ready.</span></li>
+                </ol>
+              </section>
+              <section className="panel">
+                <div className="panel-title"><BrainCircuit size={16} /> Beginner vs Advanced</div>
+                <p className="muted-note">Beginner Mode adds guidance and emphasizes safe next steps. Advanced Mode keeps the same tools but reduces extra guidance and works better for experienced users.</p>
+                <div className="segmented-mode-row">
+                  <button className={preferences.interfaceMode === 'beginner' ? 'active' : ''} onClick={() => updatePreference('interfaceMode', 'beginner')}>Beginner Mode</button>
+                  <button className={preferences.interfaceMode === 'advanced' ? 'active' : ''} onClick={() => updatePreference('interfaceMode', 'advanced')}>Advanced Mode</button>
+                </div>
+              </section>
+              <section className="panel">
+                <div className="panel-title"><LayoutTemplate size={16} /> Sample projects</div>
+                <p className="muted-note">Learn by creating something safe and disposable first.</p>
+                <div className="vertical-actions">
+                  <button className="secondary-button" onClick={() => { setSelectedTemplateId('web_project'); completeOnboarding('templates'); }}>Create Sample Website</button>
+                  <button className="secondary-button" onClick={() => { setSelectedTemplateId('react_vite_site'); completeOnboarding('templates'); }}>Create React/Vite Website</button>
+                  <button className="secondary-button" onClick={() => { setSelectedTemplateId('tauri_react'); completeOnboarding('templates'); }}>Create Tauri Desktop App</button>
+                </div>
+              </section>
+            </div>
+          </section>
+        )}
 
         {activePage === 'editor' && (
           <section className={`page-content editor-page-content ${openFiles.length === 0 ? 'no-open-tabs' : ''}`}>
@@ -2746,7 +3632,7 @@ ERROR: ${String(error)}
             </nav>
 
             <section className="editor-wrap">
-              <div className={`editor-ai-layout ${aiDockOpen ? 'dock-open' : 'dock-closed'} ${activeFile ? 'has-active-file' : 'no-active-file'}`}>
+              <div className={`editor-ai-layout dock-closed ${activeFile ? 'has-active-file' : 'no-active-file'}`}>
                 <div className="editor-canvas">
                   {activeFile ? (
                     <Editor
@@ -2773,7 +3659,7 @@ ERROR: ${String(error)}
                     <div className="welcome-card editor-welcome-card">
                       <ShieldCheck size={48} />
                       <h2>Open a file to start editing.</h2>
-                      <p>Version 0.4.9 keeps the AI Assistant visible by default and uses pointer-based toolbar sorting so you can drag Workspace Menu buttons into your preferred order.</p>
+                      <p>Version 0.6.9 removes the duplicate Setup & Dependencies button from the Workspace Menu so the main focus items have more room on one line.</p>
                       <div className="recent-files-card">
                         <div className="recent-files-header">
                           <strong>Recent Files</strong>
@@ -2797,50 +3683,6 @@ ERROR: ${String(error)}
                   )}
                 </div>
 
-                {aiDockOpen && (
-                  <aside className="editor-ai-dock">
-                    <div className="editor-ai-dock-header">
-                      <div>
-                        <div className="panel-title"><Bot size={15} /> AI Assistant</div>
-                        <p className="muted-note">Open by default on the Editor page for easier copy/paste. Use AI Panel to hide it.</p>
-                      </div>
-                      <button className="icon-only-button" onClick={() => setAiDockOpen(false)} title="Hide AI panel">×</button>
-                    </div>
-
-                    <label className="setting-row compact-setting-row">
-                      <span>Context</span>
-                      <select value={aiContextMode} onChange={(event) => setAiContextMode(event.target.value as AiContextPreference)}>
-                        <option value="selection">Selection / file</option>
-                        <option value="currentFile">Current file</option>
-                        <option value="problems">Problems</option>
-                        <option value="terminal">Terminal</option>
-                        <option value="git">Git</option>
-                      </select>
-                    </label>
-
-                    <textarea
-                      className="editor-ai-prompt"
-                      value={aiPrompt}
-                      onChange={(event) => setAiPrompt(event.target.value)}
-                      placeholder="Ask AI about this file, selected code, diagnostics, terminal output, or Git status..."
-                    />
-
-                    <div className="editor-ai-dock-actions">
-                      <button onClick={askAi} disabled={aiBusy || preferences.aiProvider === 'disabled'}><Send size={13} /> {aiBusy ? 'Working...' : 'Ask'}</button>
-                      <button type="button" onClick={() => prepareAiCodeAction('explain-selection')} disabled={aiBusy || !activeFile}>Explain</button>
-                      <button type="button" onClick={() => prepareAiCodeAction('review-current-file')} disabled={aiBusy || !activeFile}>Review</button>
-                    </div>
-
-                    <pre className="editor-ai-response-output">{aiResponse}</pre>
-
-                    <div className="editor-ai-dock-actions">
-                      <button onClick={() => navigator.clipboard.writeText(aiResponse)} disabled={!aiResponse.trim()}><Copy size={13} /> Copy</button>
-                      <button onClick={insertAiResponseIntoEditor} disabled={!activeFile || !aiResponse.trim()}><Edit3 size={13} /> Insert</button>
-                      <button onClick={insertAiResponseAsComment} disabled={!activeFile || !aiResponse.trim()}>Comment</button>
-                      <button onClick={() => setActivePage('ai')}><ExternalLink size={13} /> Full AI</button>
-                    </div>
-                  </aside>
-                )}
               </div>
             </section>
 
@@ -2862,7 +3704,7 @@ ERROR: ${String(error)}
               <div className="ai-header">
                 <div>
                   <div className="panel-title"><Bot size={16} /> AI Coding Assistant</div>
-                  <p className="muted-note">Optional, privacy-aware coding help. Configure OpenAI or Ollama in Settings. The app asks before sending code when confirmation is enabled.</p>
+                  <p className="muted-note">Optional, privacy-aware project assistant. Configure OpenAI or Ollama in Settings. The app asks before sending project/file context when confirmation is enabled.</p>
                 </div>
                 <span className={`status-pill ${preferences.aiProvider === 'disabled' ? 'warn-pill' : 'success-pill'}`}>
                   {preferences.aiProvider === 'disabled' ? 'AI Disabled' : `${preferences.aiProvider === 'openai' ? 'OpenAI' : 'Ollama'} Ready`}
@@ -2876,6 +3718,7 @@ ERROR: ${String(error)}
                     <select value={aiContextMode} onChange={(event) => setAiContextMode(event.target.value as AiContextPreference)}>
                       <option value="selection">Selected code / active file fallback</option>
                       <option value="currentFile">Current file</option>
+                      <option value="project">Whole project</option>
                       <option value="problems">Problems / diagnostics output</option>
                       <option value="terminal">Recent terminal output</option>
                       <option value="git">Git status summary</option>
@@ -2888,25 +3731,34 @@ ERROR: ${String(error)}
                     placeholder="Ask the AI to explain, debug, refactor, document, or improve code..."
                   />
                   <div className="ai-code-actions">
-                    <div className="mini-section-title">Code Actions</div>
-                    <div className="ai-action-grid">
+                    <div className="mini-section-title">Project-Aware AI Actions</div>
+                    <div className="ai-action-grid project-aware-grid">
+                      <button type="button" onClick={() => prepareProjectAiAction('ask-project')} disabled={aiBusy}>Ask AI About This Project</button>
+                      <button type="button" onClick={() => prepareProjectAiAction('explain-current-file')} disabled={aiBusy || !activeFile}>Explain Current File</button>
+                      <button type="button" onClick={() => prepareProjectAiAction('find-bugs')} disabled={aiBusy}>Find Bugs</button>
+                      <button type="button" onClick={() => prepareProjectAiAction('improve-code')} disabled={aiBusy}>Improve This Code</button>
+                      <button type="button" onClick={() => prepareProjectAiAction('generate-missing-file')} disabled={aiBusy}>Generate Missing File</button>
+                      <button type="button" onClick={() => prepareProjectAiAction('create-readme')} disabled={aiBusy}>Create README</button>
+                      <button type="button" onClick={() => prepareProjectAiAction('create-installer-script')} disabled={aiBusy}>Create Installer Script</button>
+                      <button type="button" onClick={() => prepareProjectAiAction('summarize-project')} disabled={aiBusy}>Summarize Project</button>
+                    </div>
+                    <div className="mini-section-title subdued-title">Focused Code Actions</div>
+                    <div className="ai-action-grid compact-code-action-grid">
                       <button type="button" onClick={() => prepareAiCodeAction('explain-selection')} disabled={aiBusy || !activeFile}>Explain Selection</button>
-                      <button type="button" onClick={() => prepareAiCodeAction('review-current-file')} disabled={aiBusy || !activeFile}>Review File</button>
                       <button type="button" onClick={() => prepareAiCodeAction('fix-problems')} disabled={aiBusy}>Fix Problems</button>
                       <button type="button" onClick={() => prepareAiCodeAction('explain-terminal')} disabled={aiBusy}>Explain Terminal</button>
                       <button type="button" onClick={() => prepareAiCodeAction('commit-message')} disabled={aiBusy}>Commit Message</button>
-                      <button type="button" onClick={() => prepareAiCodeAction('refactor-selection')} disabled={aiBusy || !activeFile}>Refactor Selection</button>
                       <button type="button" onClick={() => prepareAiCodeAction('add-comments')} disabled={aiBusy || !activeFile}>Generate Comments</button>
                       <button type="button" onClick={() => prepareAiCodeAction('unit-test')} disabled={aiBusy || !activeFile}>Suggest Tests</button>
                     </div>
                   </div>
                   <div className="ai-actions">
                     <button onClick={askAi} disabled={aiBusy || preferences.aiProvider === 'disabled'}><Send size={14} /> {aiBusy ? 'Working...' : 'Ask AI'}</button>
-                    <button onClick={() => { setAiContextMode('selection'); setAiPrompt('Explain the selected code and identify possible bugs, security concerns, and maintainability improvements.'); }} disabled={aiBusy}>Explain / Review</button>
-                    <button onClick={() => { setAiContextMode('problems'); setAiPrompt('Use the Problems output to explain the build error and recommend the exact files or commands to fix it.'); }} disabled={aiBusy}>Explain Problems</button>
-                    <button onClick={() => { setAiContextMode('git'); setAiPrompt('Create a concise Git commit message based on the Git status context.'); }} disabled={aiBusy}>Commit Message</button>
+                    <button onClick={() => prepareProjectAiAction('ask-project')} disabled={aiBusy}>Ask Project</button>
+                    <button onClick={() => prepareProjectAiAction('summarize-project')} disabled={aiBusy}>Summarize Project</button>
+                    <button onClick={() => prepareProjectAiAction('create-installer-script')} disabled={aiBusy}>Installer Script</button>
                   </div>
-                  <p className="muted-note">Sensitive files should be excluded with <code>.aiignore</code>. v0.4.1 prepares targeted prompts, asks before sending context when enabled, and never changes files without a manual action.</p>
+                  <p className="muted-note">Sensitive files should be excluded with <code>.aiignore</code>. v0.6.9 can prepare project-wide prompts, web deployment plans, onboarding guidance, hosting help, movable AI Help guidance, consistent guide panels, open-source acknowledgment guidance, and cleaner one-line workspace navigation while still asking before sending context when enabled.</p>
                 </section>
 
                 <section className="ai-response-card">
@@ -3497,7 +4349,7 @@ ERROR: ${String(error)}
           <section className="page-content utility-page registry-page">
             <div className="registry-layout">
               <section className="panel registry-summary-panel">
-                <div className="panel-title"><Wrench size={16} /> Registry Overview</div>
+                <div className="panel-title"><Wrench size={16} /> Tool Registry Overview</div>
                 <p className="muted-note">Manage built-in and custom command shortcuts without cluttering the main editor interface.</p>
                 <div className="registry-stat-grid">
                   <span><strong>{registryStats.total}</strong> total</span>
@@ -3513,7 +4365,7 @@ ERROR: ${String(error)}
                 </label>
                 <div className="registry-actions-row">
                   <button className="secondary-button" onClick={() => setRegistryDraft(newCustomRegistryDraft())}><RefreshCw size={14} /> Clear Form</button>
-                  <button className="danger-button" onClick={resetToolRegistry}><Trash2 size={14} /> Reset Registry</button>
+                  <button className="danger-button" onClick={resetToolRegistry}><Trash2 size={14} /> Reset Tool Registry</button>
                 </div>
               </section>
 
@@ -3536,7 +4388,7 @@ ERROR: ${String(error)}
                     <span>Description</span>
                     <textarea value={registryDraft.description} onChange={(event) => updateRegistryDraft('description', event.target.value)} placeholder="What this tool does and when to use it." />
                   </label>
-                  <button onClick={addCustomRegistryTool}><FilePlus2 size={14} /> Add to Registry</button>
+                  <button onClick={addCustomRegistryTool}><FilePlus2 size={14} /> Add to Tool Registry</button>
                 </div>
               </section>
 
@@ -3573,14 +4425,95 @@ ERROR: ${String(error)}
           </section>
         )}
 
+
+        {activePage === 'web' && (
+          <section className="page-content utility-page web-builder-page">
+            <div className="web-builder-grid">
+              <section className="panel web-builder-hero">
+                <div className="git-page-header">
+                  <div>
+                    <div className="panel-title"><Globe2 size={16} /> Web Builder</div>
+                    <p className="muted-note">Build, preview, host locally, test on your LAN, and prepare global deployments for static and React/Vite websites.</p>
+                  </div>
+                  <button className="secondary-button" onClick={() => setActivePage('setup')}><PackageCheck size={14} /> Setup Web Tools</button>
+                </div>
+                <div className="web-builder-flow">
+                  <span>1. Create or open a web project</span>
+                  <ChevronRight size={14} />
+                  <span>2. Install components</span>
+                  <ChevronRight size={14} />
+                  <span>3. Host locally</span>
+                  <ChevronRight size={14} />
+                  <span>4. Build and deploy globally</span>
+                </div>
+                <p className="muted-note">Local hosting uses your workspace folder. Global deployment commands require the matching provider account and CLI login.</p>
+              </section>
+
+              <section className="panel web-hosting-panel">
+                <div className="panel-title"><Play size={16} /> Local and Global Hosting</div>
+                <div className="web-card-grid">
+                  {webBuilderActions.map((item) => (
+                    <article key={item.title} className="web-action-card">
+                      <div className="web-card-top">
+                        <strong>{item.title}</strong>
+                        <span>{item.mode}</span>
+                      </div>
+                      <p>{item.description}</p>
+                      <code>{item.command}</code>
+                      <div className="web-action-buttons">
+                        <button className="secondary-button" onClick={() => prepareWebBuilderCommand(item.command)}><TerminalSquare size={14} /> Prepare</button>
+                        <button onClick={() => runWebBuilderCommand(item.title, item.command)}><Play size={14} /> Run</button>
+                      </div>
+                    </article>
+                  ))}
+                </div>
+              </section>
+
+              <section className="panel web-components-panel">
+                <div className="panel-title"><PackageCheck size={16} /> Installable Web Components and Tools</div>
+                <p className="muted-note">Use these buttons to add common web-building packages to the active project. Review package choices before saving or publishing.</p>
+                <div className="web-component-grid">
+                  {webComponentActions.map((item) => (
+                    <article key={item.name} className="web-component-card">
+                      <strong>{item.name}</strong>
+                      <p>{item.description}</p>
+                      <code>{item.command}</code>
+                      <div className="web-action-buttons">
+                        <button className="secondary-button" onClick={() => prepareWebBuilderCommand(item.command)}><TerminalSquare size={14} /> Prepare</button>
+                        <button onClick={() => runWebBuilderCommand(`Install ${item.name}`, item.command)}><PackageCheck size={14} /> Install</button>
+                      </div>
+                    </article>
+                  ))}
+                </div>
+              </section>
+
+              <section className="panel web-stack-panel">
+                <div className="panel-title"><LayoutTemplate size={16} /> Recommended Web Stack</div>
+                <ul className="web-stack-list">
+                  <li><strong>Static site:</strong> HTML, CSS, JavaScript, Vite preview, GitHub Pages/Netlify/Vercel.</li>
+                  <li><strong>React site:</strong> React + Vite + TypeScript, React Router, Tailwind CSS or Bootstrap.</li>
+                  <li><strong>Business site:</strong> reusable components, responsive layout, SEO metadata, contact/download pages.</li>
+                  <li><strong>Deployment:</strong> build with <code>npm run build</code>, preview with <code>npm run preview</code>, deploy with Vercel/Netlify/GitHub Pages.</li>
+                </ul>
+                <div className="web-action-buttons vertical-actions">
+                  <button className="secondary-button" onClick={() => { setActivePage('templates'); setSelectedTemplateId('web_project'); }}><LayoutTemplate size={14} /> New Static Website</button>
+                  <button className="secondary-button" onClick={() => { setActivePage('templates'); setSelectedTemplateId('react_vite_site'); }}><LayoutTemplate size={14} /> New React/Vite Website</button>
+                  <button className="secondary-button" onClick={() => prepareProjectAiAction('create-readme')}><Bot size={14} /> AI Website README</button>
+                  <button className="secondary-button" onClick={() => { setAiContextMode('project'); setAiPrompt('Create a practical web deployment plan for this project. Include local preview, LAN testing, production build, Vercel, Netlify, GitHub Pages, DNS/custom domain notes, and a final pre-launch checklist.'); setActivePage('ai'); }}><Bot size={14} /> AI Deployment Plan</button>
+                </div>
+              </section>
+            </div>
+          </section>
+        )}
+
         {activePage === 'setup' && (
           <section className="page-content utility-page setup-page">
             <div className="setup-layout">
               <section className="panel setup-summary-panel">
                 <div className="git-page-header">
                   <div>
-                    <div className="panel-title"><PackageCheck size={16} /> Dependency Setup Center</div>
-                    <p className="muted-note">Check and install the developer tools Diligent Code Studio uses for editing, building, packaging, Git, and optional local AI.</p>
+                    <div className="panel-title"><PackageCheck size={16} /> Setup & Dependencies</div>
+                    <p className="muted-note">Check and install the developer tools Diligent Code Studio uses for editing, building, packaging, Git, releases, and optional local AI.</p>
                   </div>
                   <button className="secondary-button" onClick={refreshSetupDependencies} disabled={setupLoading}>
                     <RefreshCw size={14} /> {setupLoading ? 'Checking...' : 'Check Again'}
@@ -3598,7 +4531,7 @@ ERROR: ${String(error)}
               <section className="panel setup-log-panel">
                 <div className="panel-title"><TerminalSquare size={16} /> Setup Install Log</div>
                 <div className="setup-log-actions">
-                  <button className="secondary-button" onClick={() => setSetupOutput('Dependency Setup Center ready.\n')}><Trash2 size={14} /> Clear</button>
+                  <button className="secondary-button" onClick={() => setSetupOutput('Setup & Dependencies ready.\n')}><Trash2 size={14} /> Clear</button>
                   <button className="secondary-button" onClick={() => navigator.clipboard.writeText(setupOutput)}><Copy size={14} /> Copy Log</button>
                 </div>
                 <pre className="terminal-output setup-output">{setupOutput}</pre>
@@ -3750,6 +4683,51 @@ ERROR: ${String(error)}
               <section className="panel hash-panel">
                 <div className="panel-title"><Hash size={16} /> Active File Hash</div>
                 <code>{activeFile?.sha256 ?? 'No hash calculated yet.'}</code>
+              </section>
+            </div>
+          </section>
+        )}
+
+
+        {activePage === 'credits' && (
+          <section className="page-content utility-page credits-page">
+            <div className="credits-layout">
+              <section className="panel credits-hero-panel">
+                <div>
+                  <div className="panel-title"><ExternalLink size={16} /> Open Source Credits</div>
+                  <h2>Built with gratitude for the open-source community.</h2>
+                  <p className="muted-note">Diligent Code Studio depends on open-source frameworks, libraries, tools, and community projects. This page gives users a visible place to recognize those contributors and open each project website in the default browser.</p>
+                </div>
+                <div className="credits-stat-grid">
+                  <span><strong>{OPEN_SOURCE_CREDITS.length}</strong> projects</span>
+                  <span><strong>{new Set(OPEN_SOURCE_CREDITS.map((credit) => credit.category)).size}</strong> categories</span>
+                </div>
+              </section>
+
+              <section className="panel credits-note-panel">
+                <div className="panel-title"><ShieldCheck size={16} /> Respecting Licenses</div>
+                <p className="muted-note">This credits page is an acknowledgment page, not a replacement for license review. Before public release, review each dependency license and keep NOTICE, LICENSE, third-party notices, and package manifests up to date.</p>
+              </section>
+
+              <section className="panel credits-list-panel">
+                <div className="panel-title"><Globe2 size={16} /> Project Links</div>
+                <div className="credits-card-grid">
+                  {OPEN_SOURCE_CREDITS.map((credit) => (
+                    <article key={`${credit.category}-${credit.name}`} className="credits-card">
+                      <div className="credits-card-header">
+                        <div>
+                          <strong>{credit.name}</strong>
+                          <span>{credit.category}</span>
+                        </div>
+                        <button className="secondary-button" onClick={() => openOpenSourceCredit(credit)} title={`Open ${credit.name} website`}>
+                          <ExternalLink size={14} /> Visit
+                        </button>
+                      </div>
+                      <p>{credit.role}</p>
+                      <code>{credit.website}</code>
+                    </article>
+                  ))}
+                </div>
               </section>
             </div>
           </section>
@@ -3916,6 +4894,7 @@ ERROR: ${String(error)}
                   <select value={preferences.aiDefaultContext} onChange={(event) => updatePreference('aiDefaultContext', event.target.value as AiContextPreference)}>
                     <option value="selection">Selected code</option>
                     <option value="currentFile">Current file</option>
+                    <option value="project">Whole project</option>
                     <option value="problems">Problems output</option>
                     <option value="terminal">Terminal output</option>
                     <option value="git">Git status</option>
@@ -3925,6 +4904,13 @@ ERROR: ${String(error)}
                   <input type="checkbox" checked={preferences.aiRequireConfirmation} onChange={(event) => updatePreference('aiRequireConfirmation', event.target.checked)} />
                   Require confirmation before sending code/context to AI
                 </label>
+                <div className="security-note-box">
+                  <ShieldCheck size={16} />
+                  <div>
+                    <strong>Session-only API key storage</strong>
+                    <p className="muted-note">OpenAI API keys are kept only in memory for the current app session and are not saved to local preferences. Ollama remains the recommended local-first option for private code reviews.</p>
+                  </div>
+                </div>
               </section>
 
               <section className="panel settings-panel">
@@ -3949,7 +4935,7 @@ ERROR: ${String(error)}
                   <input type="checkbox" checked={preferences.rememberLastActivePage} onChange={(event) => updatePreference('rememberLastActivePage', event.target.checked)} />
                   Remember last active page
                 </label>
-                <p className="muted-note">Settings are stored locally on this computer. No telemetry or account sync is included.</p>
+                <p className="muted-note">Settings are stored locally on this computer. No telemetry or account sync is included. Sensitive secrets such as OpenAI API keys are not persisted by Diligent Code Studio.</p>
                 <div className="settings-actions">
                   <button className="danger-button" onClick={resetPreferences}><Trash2 size={14} /> Reset Preferences</button>
                 </div>
@@ -3978,7 +4964,117 @@ ERROR: ${String(error)}
             </section>
           </section>
         )}
+
       </section>
+
+
+      {onboardingOpen && (
+        <section className="onboarding-overlay" role="dialog" aria-modal="true" aria-label="Welcome to Diligent Code Studio">
+          <div className="onboarding-dialog">
+            <header className="onboarding-header">
+              <div>
+                <div className="panel-title"><Rocket size={18} /> Welcome to Diligent Code Studio</div>
+                <h2>What do you want to do first?</h2>
+                <p>Pick a path and the app will take you to the right workspace. You can reopen this wizard from Start Here.</p>
+              </div>
+              <button className="icon-only-button" onClick={() => completeOnboarding()}>×</button>
+            </header>
+            <div className="onboarding-choice-grid">
+              <button onClick={() => completeOnboarding('templates')}><LayoutTemplate size={20} /><strong>Build a desktop app</strong><span>Start from a project template.</span></button>
+              <button onClick={() => completeOnboarding('web')}><Globe2 size={20} /><strong>Build a website</strong><span>Preview locally or prepare public hosting.</span></button>
+              <button onClick={() => completeOnboarding('editor')}><FolderOpen size={20} /><strong>Open an existing project</strong><span>Choose a folder and edit files.</span></button>
+              <button onClick={() => completeOnboarding('ai')}><Bot size={20} /><strong>Use AI with code</strong><span>Ask project-aware coding questions.</span></button>
+              <button onClick={() => completeOnboarding('setup')}><PackageCheck size={20} /><strong>Set up my computer</strong><span>Install and verify required tools.</span></button>
+              <button onClick={() => completeOnboarding('release')}><Rocket size={20} /><strong>Create an installer</strong><span>Validate, build, and package releases.</span></button>
+              <button onClick={() => completeOnboarding('credits')}><ExternalLink size={20} /><strong>View open-source credits</strong><span>Recognize the contributors behind the tools used here.</span></button>
+            </div>
+            <footer className="onboarding-footer">
+              <button className="secondary-button" onClick={() => updatePreference('interfaceMode', 'beginner')}>Use Beginner Mode</button>
+              <button className="secondary-button" onClick={() => updatePreference('interfaceMode', 'advanced')}>Use Advanced Mode</button>
+              <button className="secondary-button" onClick={() => completeOnboarding('start')}>Go to Start Here</button>
+            </footer>
+          </div>
+        </section>
+      )}
+
+      {helpManualOpen && (
+        <section className="help-manual-overlay" role="dialog" aria-modal="true" aria-label="Diligent Code Studio User Manual">
+          <div className="help-manual-dialog">
+            <header className="help-manual-header">
+              <div>
+                <strong>Diligent Code Studio User Manual</strong>
+                <span>PDF help for setup, navigation, AI assistance, Git, diagnostics, and release packaging.</span>
+              </div>
+              <div className="help-manual-actions">
+                <button className="secondary-button" onClick={() => window.open(USER_MANUAL_PATH, '_blank', 'noopener,noreferrer')}><ExternalLink size={14} /> Open PDF</button>
+                <button className="secondary-button" onClick={() => setHelpManualOpen(false)}>Close</button>
+              </div>
+            </header>
+            <iframe
+              className="help-manual-frame"
+              title="Diligent Code Studio User Manual PDF"
+              src={`${USER_MANUAL_PATH}#view=FitH`}
+            />
+          </div>
+        </section>
+      )}
+
+
+      {aiDockOpen && (
+        <aside
+          ref={assistantPocketRef}
+          className={`assistant-pocket expanded ${aiHelpDragging ? 'dragging' : ''}`}
+          aria-label="AI Help"
+          style={{ left: `${aiHelpPosition.left}px`, top: `${aiHelpPosition.top}px` }}
+        >
+          <div
+            className="assistant-pocket-header draggable-ai-help-header"
+            onPointerDown={beginAiHelpDrag}
+            onPointerMove={moveAiHelpDrag}
+            onPointerUp={endAiHelpDrag}
+            onPointerCancel={endAiHelpDrag}
+            title="Drag AI Help to move it"
+          >
+            <div>
+              <div className="panel-title"><Bot size={15} /> AI Help <span className="drag-hint">Drag to move</span></div>
+              <p className="muted-note">Quick navigation and screen help. Coding results stay in the AI Coding Assistant window unless you ask from here.</p>
+            </div>
+            <div className="assistant-pocket-window-actions">
+              <button className="icon-only-button" onClick={resetAiHelpPosition} title="Reset AI Help position"><RefreshCw size={13} /></button>
+              <button className="icon-only-button" onClick={() => setAiDockOpen(false)} title="Close AI Help">×</button>
+            </div>
+          </div>
+
+          <div className="assistant-pocket-quick-row project-aware-pocket-row">
+            <button type="button" onClick={() => prepareAiHelpAction('navigate')} disabled={aiBusy}>Navigate This Screen</button>
+            <button type="button" onClick={() => prepareAiHelpAction('project')} disabled={aiBusy}>Project Status</button>
+            <button type="button" onClick={() => { setActivePage('ai'); setAiDockOpen(false); }} disabled={aiBusy}>Open AI Window</button>
+            <button type="button" onClick={() => prepareAiHelpAction('coding')} disabled={aiBusy}>Where Is Coding Help?</button>
+          </div>
+
+          <textarea
+            className="editor-ai-prompt assistant-pocket-prompt"
+            value={aiHelpPrompt}
+            onChange={(event) => setAiHelpPrompt(event.target.value)}
+            placeholder="Ask for help navigating this screen or understanding what to do next..."
+          />
+
+          <div className="editor-ai-dock-actions assistant-pocket-actions">
+            <button onClick={askAiHelp} disabled={aiBusy || preferences.aiProvider === 'disabled'}><Send size={13} /> {aiBusy ? 'Working...' : 'Ask'}</button>
+            <button onClick={() => navigator.clipboard.writeText(aiHelpResponse)} disabled={!aiHelpResponse.trim()}><Copy size={13} /> Copy</button>
+            <button onClick={() => setAiHelpResponse('AI Help ready. Ask a quick navigation question, or open the AI Coding Assistant window for full coding output.\n')}><Trash2 size={13} /> Clear</button>
+            <button onClick={() => setActivePage('settings')}>Settings</button>
+          </div>
+
+          <pre className="editor-ai-response-output assistant-pocket-response">{aiHelpResponse}</pre>
+
+          <div className="assistant-pocket-status">
+            <span className={preferences.aiProvider === 'disabled' ? 'warn-text' : 'ok-text'}>{preferences.aiProvider === 'disabled' ? 'AI disabled' : `Provider: ${preferences.aiProvider}`}</span>
+            <span>Main coding output: AI window</span>
+          </div>
+        </aside>
+      )}
+
     </main>
   );
 }

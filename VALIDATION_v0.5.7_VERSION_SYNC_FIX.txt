@@ -1,0 +1,12 @@
+Diligent Code Studio v0.5.7 Version Sync validation
+
+Checks completed:
+- npm ci
+- npm run build
+- Rendered PDF manual to PNG pages using the PDF verification workflow
+- Verified public/manuals contains DiligentCodeStudio_UserManual_v0.5.7.pdf
+- Verified dist/manuals contains DiligentCodeStudio_UserManual_v0.5.7.pdf
+- Verified source/package metadata references 0.5.7
+
+Known limitation:
+- Native Tauri executable was not compiled in this sandbox because Rust/Cargo is not available here.
