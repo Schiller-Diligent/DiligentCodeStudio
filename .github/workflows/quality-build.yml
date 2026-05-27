@@ -3,8 +3,13 @@ name: Build Diligent Code Studio Cross-Platform Release
 on:
   workflow_dispatch:
   push:
+    branches:
+      - main
     tags:
       - "v*.*.*"
+  pull_request:
+    branches:
+      - main
 
 env:
   EXPECTED_VERSION: "0.6.10"
@@ -156,12 +161,10 @@ jobs:
       - name: Build Tauri app from repository root
         run: npm run tauri:build
 
-	      - name: Upload build artifacts
-
       - name: Upload build artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: diligent-code-studio-${{ matrix.platform }}-0.6.10
+          name: diligent-code-studio-${{ matrix.artifact_name }}-${{ env.EXPECTED_VERSION }}
           path: |
             src-tauri/target/release/bundle/**/*
           if-no-files-found: error
