@@ -1,4 +1,4 @@
-{
+﻿{
   "$schema": "https://schema.tauri.app/config/2",
   "productName": "Diligent Code Studio",
   "version": "0.6.10",
@@ -38,3 +38,4 @@
     ]
   }
 }
+
