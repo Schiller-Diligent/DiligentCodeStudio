@@ -1,4 +1,4 @@
-﻿[package]
+[package]
 name = "diligent-code-studio"
 version = "0.6.10"
 description = "Diligent Code Studio Community Edition"
