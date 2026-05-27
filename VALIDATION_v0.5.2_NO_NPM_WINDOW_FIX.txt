@@ -1,0 +1,17 @@
+Diligent Code Studio v0.5.2 Validation
+
+Validated in this environment:
+  npm ci
+  npm run build
+
+Result:
+  React / TypeScript / Vite frontend build completed successfully.
+
+Rust/Tauri native compile note:
+  Cargo/Rust is not installed in this sandbox, so the native Tauri executable could not be compiled here.
+  The Rust-side patch is source-level and should be validated locally with:
+    npm run tauri:build
+
+Expected Windows result:
+  The installed app launches without an npm/PowerShell/console window.
+  Explicit Open Terminal still opens a terminal by design.

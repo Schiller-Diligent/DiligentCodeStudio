@@ -1,0 +1,6 @@
+Diligent Code Studio v0.5.6 Project-Aware AI validation:
+- npm ci: PASS
+- npm run build: PASS
+- Added Project AI context mode
+- Added project-aware quick action buttons
+- Verified TypeScript compile and Vite production build

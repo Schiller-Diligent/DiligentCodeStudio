@@ -1,0 +1,14 @@
+Diligent Code Studio v0.6.10 validation
+
+Commands completed successfully:
+- npm ci
+- npm run validate
+- npm run build
+- npm run audit:npm
+
+Audit result:
+- found 0 vulnerabilities
+
+Notes:
+- monaco-editor is pinned to 0.53.0 to avoid the DOMPurify advisory chain present in newer Monaco builds.
+- Cargo/Tauri native validation should still be run on a local Windows developer machine.

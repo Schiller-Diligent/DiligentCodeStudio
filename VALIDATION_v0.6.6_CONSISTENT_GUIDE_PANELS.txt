@@ -1,0 +1,18 @@
+Diligent Code Studio v0.6.6 validation
+
+Validated successfully:
+- npm ci
+- npm run validate
+- npm run build
+
+Results:
+- TypeScript typecheck passed.
+- Smoke test passed.
+- Unit tests passed.
+- Security check passed.
+- Vite production build passed.
+
+Note:
+- Rust/Tauri native build should be run on a Windows development machine with Rust/Cargo installed:
+  npm run check:rust
+  npm run tauri:build

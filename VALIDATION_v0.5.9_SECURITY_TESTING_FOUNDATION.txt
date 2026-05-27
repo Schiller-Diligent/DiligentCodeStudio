@@ -1,0 +1,22 @@
+Diligent Code Studio v0.5.9 Security + Testing Foundation validation
+
+Validated in this build environment:
+- npm ci: passed
+- npm run validate: passed
+  - TypeScript app + Vite config typecheck passed
+  - smoke-test.mjs passed
+  - unit-test.mjs passed with 5 passing tests
+  - security-check.mjs passed
+- npm run build: passed
+- PDF manual v0.5.9 rendered to 5 pages and representative pages were visually checked
+
+Not validated in this sandbox:
+- cargo check / cargo test / npm run tauri:build, because Rust/Cargo is not installed in the sandbox
+
+Recommended local commands:
+- npm ci
+- npm run validate
+- npm run build
+- npm run check:rust
+- npm run test:rust
+- npm run tauri:build

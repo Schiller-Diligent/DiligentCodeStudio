@@ -1,0 +1,14 @@
+Diligent Code Studio v0.6.5 validation
+
+Validated in sandbox:
+- npm ci: PASSED
+- npm run validate: PASSED
+- npm run build: PASSED
+- PDF manual render verification: PASSED for first and v0.6.5 addendum pages
+
+Not run in sandbox:
+- npm run check:rust
+- npm run test:rust
+- npm run tauri:build
+
+Reason: Rust/Cargo is not available in this sandbox environment.

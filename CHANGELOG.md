@@ -1,3 +1,71 @@
+## v0.6.3 - Rust Template Build Fix
+
+- Fixed Rust/Tauri build failure caused by the Web Builder static website template raw string.
+- Changed the static website HTML template in `src-tauri/src/main.rs` from a one-hash raw string to a two-hash raw string so `href="#content"` no longer terminates the Rust string early.
+- Added a v0.6.3 cumulative manual addendum documenting this build fix.
+- Synced visible app/package/Tauri/Cargo versions to 0.6.3.
+
+## v0.6.2 - Web Builder + Hosting Tools
+
+- Added dedicated Web Builder workspace page.
+- Added local dev, LAN preview, production build, and production preview actions.
+- Added Vercel and Netlify deployment command helpers.
+- Added installable web component/tool actions.
+- Added Static Website and React + Vite Website templates.
+- Added Vercel CLI, Netlify CLI, and pnpm dependency checks.
+- Appended v0.6.2 addendum to the cumulative PDF manual.
+
+## v0.6.1 - Cumulative User Manual Policy
+
+- Changed the Manual button to open a stable cumulative manual file.
+- Preserved the original v0.5.5 manual pages at the front of the PDF.
+- Appended version addenda through v0.6.1 instead of replacing the manual content.
+- Added manual archives under docs/manuals.
+- Synced visible UI, package, Tauri, Cargo, and manual references to 0.6.1.
+
+## v0.5.6 - Help Button and Built-in PDF User Manual
+
+- Added a Help button in the top-right app bar.
+- Added a built-in PDF User Manual viewer inside the application.
+- Added the user manual PDF under public/manuals for bundled app access.
+- Added a copy of the manual under docs for source package access.
+- Bumped package, Tauri, and Cargo versions to 0.5.6.
+
+# Changelog
+
+## v0.5.4 - Cleaner Screen Layout
+
+- Removed the always-open global Terminal/Workbench panel from every screen.
+- Kept Terminal access on the dedicated Terminal page.
+- Kept Problems, Release, Logs, and AI output available in their appropriate screens.
+- Preserved compact AI Help on every screen.
+- Bumped package, Tauri, and Cargo versions to 0.5.4.
+
+## v0.5.1 - Compact AI Everywhere
+
+- Reworked the large global AI side panel into a compact floating AI helper.
+- AI remains available on every screen without taking permanent workspace width.
+- Added minimized AI Help button for quick access.
+- Kept coding actions for Explain, Bugs, Errors, Terminal, Git, and Navigate.
+- Preserved Settings access, provider status, response copy, and insert-to-editor actions.
+- Restored full-width main workspace by removing the dedicated AI grid column.
+
+## v0.5.0 - Next-Level UI + Workflow Upgrade
+
+- Bumped app/package/Tauri/Cargo versions to 0.5.0.
+- Added a professional top app bar with a project health/status strip.
+- Kept the Workspace Menu in a fixed top area with no horizontal scrolling.
+- Preserved direct drag-and-drop ordering for Workspace Menu buttons.
+- Kept Reset Menu Order in Settings only.
+- Added a global right-side AI Assistant panel available across workspace pages.
+- Added AI quick actions for explaining files, finding bugs, reviewing errors, reviewing terminal output, summarizing Git status, and drafting documentation prompts.
+- Added a bottom workbench panel with Terminal, Problems, Output, Build Log, and AI Log tabs.
+- Renamed Setup to Setup & Dependencies.
+- Renamed Registry to Tool Registry.
+- Renamed Project / Tools to Project Health Dashboard.
+- Added stronger visual structure around project health, setup status, Git status, and AI provider status.
+- Validated the React/Vite frontend with npm ci and npm run build.
+
 
 ## v0.4.9 Workspace Menu No-Scroll Fix
 
@@ -7,8 +75,6 @@
 - Kept pointer-based drag-and-drop ordering active.
 - Kept Reset Menu Order in Settings only.
 - Preserved visible Workspace Menu labels at smaller widths.
-
-# Changelog
 
 ## v0.4.9 - Build-Hardened Workspace Polish
 

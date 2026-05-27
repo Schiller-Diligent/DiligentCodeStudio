@@ -1,0 +1,18 @@
+Diligent Code Studio v0.5.8 Quality + Reliability validation
+
+Validated commands:
+- npm ci
+- npm run validate
+- npm run build
+- npm run test
+
+Validation results:
+- TypeScript app source check passed.
+- Vite config TypeScript check passed.
+- Smoke test passed.
+- Vite production build passed.
+- Built output includes the v0.5.8 manual at dist/manuals/DiligentCodeStudio_UserManual_v0.5.8.pdf.
+- Rendered the v0.5.8 PDF manual and visually checked representative pages.
+
+Notes:
+- cargo check and tauri build require Rust/Cargo on the target machine.

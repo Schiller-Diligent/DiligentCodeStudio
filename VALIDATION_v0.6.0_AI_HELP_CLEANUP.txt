@@ -1,0 +1,22 @@
+Diligent Code Studio v0.6.0 AI Help Cleanup Validation
+
+Commands run from clean project directory:
+
+npm ci
+npm run validate
+npm run build
+
+Results:
+- npm install/restore completed successfully.
+- TypeScript typecheck passed.
+- Smoke test passed for version 0.6.0.
+- Unit tests passed.
+- Security check passed with no obvious hardcoded secrets.
+- Vite production build completed successfully.
+- PDF manual rendered successfully to images for layout verification.
+
+Rust/Tauri native installer build should be run on a workstation with Rust/Cargo installed:
+
+npm run check:rust
+npm run test:rust
+npm run tauri:build

@@ -1,0 +1,10 @@
+Diligent Code Studio v0.5.1 Compact AI Everywhere
+
+Validation commands:
+  npm ci
+  npm run build
+
+Result:
+  Frontend/source build completed successfully.
+
+Native Tauri .exe build was not compiled in the sandbox because Rust/Cargo is not installed here.
