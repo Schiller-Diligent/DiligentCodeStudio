@@ -1,170 +1,45 @@
-name: Build Diligent Code Studio Cross-Platform Release
+name: Quality Build
 
 on:
-  workflow_dispatch:
   push:
-    branches:
-      - main
-    tags:
-      - "v*.*.*"
+    branches: [main, master]
   pull_request:
-    branches:
-      - main
+  workflow_dispatch:
 
-env:
-  EXPECTED_VERSION: "0.6.10"
-  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
-  CI: true
-  NPM_CONFIG_AUDIT: false
-  NPM_CONFIG_FUND: false
-  NPM_CONFIG_UPDATE_NOTIFIER: false
-  CARGO_INCREMENTAL: 0
-  CARGO_TERM_COLOR: always
+permissions:
+  contents: read
 
 jobs:
-  build:
-    name: Build ${{ matrix.platform }}
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - platform: windows-2022
-            artifact_name: windows
-          - platform: macos-latest
-            artifact_name: macos
-          - platform: ubuntu-22.04
-            artifact_name: linux
-
-    runs-on: ${{ matrix.platform }}
-
-    defaults:
-      run:
-        working-directory: ${{ github.workspace }}
+  quality-build:
+    name: Typecheck, tests, frontend build, and audits
+    runs-on: windows-latest
 
     steps:
-      - name: Checkout repository
+      - name: Checkout
         uses: actions/checkout@v4
-        with:
-          ref: ${{ github.ref }}
-          fetch-depth: 0
-
-      - name: Show checkout diagnostics
-        shell: bash
-        run: |
-          echo "GITHUB_REF=$GITHUB_REF"
-          echo "GITHUB_REF_NAME=$GITHUB_REF_NAME"
-          echo "GITHUB_SHA=$GITHUB_SHA"
-          echo "Working directory: $(pwd)"
-          git rev-parse HEAD
-          git log --oneline -5
-          echo ""
-          echo "Package files found:"
-          find . -name package.json -not -path "*/node_modules/*" -not -path "*/target/*" -print
-
-      - name: Verify project version
-        shell: bash
-        run: |
-          echo "Expected version: $EXPECTED_VERSION"
-
-          PACKAGE_VERSION=$(node -p "require('./package.json').version")
-          echo "package.json version: $PACKAGE_VERSION"
-
-          TAURI_VERSION=$(node -e "const fs=require('fs'); const j=JSON.parse(fs.readFileSync('./src-tauri/tauri.conf.json','utf8').replace(/^\uFEFF/,'')); console.log(j.version)")
-          echo "tauri.conf.json version: $TAURI_VERSION"
-
-          CARGO_VERSION=$(node -e "const fs=require('fs'); const t=fs.readFileSync('./src-tauri/Cargo.toml','utf8').replace(/^\uFEFF/,''); const m=t.match(/^version\\s*=\\s*\"([^\"]+)\"/m); console.log(m ? m[1] : 'NOT_FOUND')")
-          echo "Cargo.toml version: $CARGO_VERSION"
-
-          if [ "$PACKAGE_VERSION" != "$EXPECTED_VERSION" ]; then
-            echo "Wrong package.json version: $PACKAGE_VERSION"
-            exit 1
-          fi
-
-          if [ "$TAURI_VERSION" != "$EXPECTED_VERSION" ]; then
-            echo "Wrong tauri.conf.json version: $TAURI_VERSION"
-            exit 1
-          fi
-
-          if [ "$CARGO_VERSION" != "$EXPECTED_VERSION" ]; then
-            echo "Wrong Cargo.toml version: $CARGO_VERSION"
-            exit 1
-          fi
-
-          echo "Verified all project versions are $EXPECTED_VERSION"
-
-      - name: Install Linux dependencies
-        if: matrix.platform == 'ubuntu-22.04'
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y \
-            build-essential \
-            curl \
-            wget \
-            file \
-            libssl-dev \
-            libgtk-3-dev \
-            libayatana-appindicator3-dev \
-            librsvg2-dev \
-            patchelf \
-            pkg-config \
-            libwebkit2gtk-4.1-dev \
-            libxdo-dev
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: "22.12.0"
-          cache: "npm"
-          cache-dependency-path: package-lock.json
+          node-version: '22.12.0'
+          cache: npm
 
-      - name: Setup Rust
+      - name: Setup Rust toolchain
         uses: dtolnay/rust-toolchain@stable
 
-      - name: Cache Rust build output
-        uses: swatinem/rust-cache@v2
+      - name: Setup Rust cache
+        uses: Swatinem/rust-cache@v2
         with:
-          workspaces: "./src-tauri -> target"
+          workspaces: src-tauri -> target
 
-      - name: Configure npm registry and retries
-        run: |
-          npm config set registry https://registry.npmjs.org/
-          npm config set fetch-retries 5
-          npm config set fetch-retry-mintimeout 20000
-          npm config set fetch-retry-maxtimeout 120000
-
-      - name: Install frontend dependencies
+      - name: Install npm dependencies
         run: npm ci
 
-      - name: Verify npm package after install
-        shell: bash
-        run: |
-          PACKAGE_VERSION=$(node -p "require('./package.json').version")
-          echo "package.json version after npm ci: $PACKAGE_VERSION"
+      - name: Run TypeScript, smoke, unit, security, build, and npm audit checks
+        run: npm run quality
 
-          if [ "$PACKAGE_VERSION" != "$EXPECTED_VERSION" ]; then
-            echo "Wrong package.json version after npm ci: $PACKAGE_VERSION"
-            exit 1
-          fi
-
-      - name: Validate frontend
-        run: npm run validate
-
-      - name: Audit npm dependencies
-        run: npm run audit:npm
-
-      - name: Build frontend
-        run: npm run build
-
-      - name: Check Rust
+      - name: Rust compile check
         run: npm run check:rust
 
-      - name: Build Tauri app from repository root
-        run: npm run tauri:build
-
-      - name: Upload build artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: diligent-code-studio-${{ matrix.artifact_name }}-${{ env.EXPECTED_VERSION }}
-          path: |
-            src-tauri/target/release/bundle/**/*
-          if-no-files-found: error
+      - name: Rust unit tests
+        run: npm run test:rust

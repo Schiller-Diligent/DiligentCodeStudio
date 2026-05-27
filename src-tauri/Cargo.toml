@@ -17,4 +17,3 @@ hex = "0.4"
 rfd = "0.15"
 
 reqwest = { version = "0.12", features = ["blocking", "json", "rustls-tls"], default-features = false }
-

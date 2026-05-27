@@ -1,6 +1,6 @@
 # Testing and Security Guide
 
-Diligent Code Studio v0.5.9 adds a stronger quality gate without adding extra npm dependencies.
+Diligent Code Studio v0.6.10 adds a stronger quality gate without adding extra npm dependencies.
 
 ## Recommended local checks
 
@@ -35,4 +35,4 @@ Current local storage is intentionally simple:
 - Recent files: local browser storage.
 - Project files: user-selected workspace folders on disk.
 
-Future storage options can add SQLite or encrypted OS keychain storage, but v0.5.9 avoids storing secrets until that backend is available.
+Future storage options can add SQLite or encrypted OS keychain storage, but v0.6.10 avoids storing secrets until that backend is available.

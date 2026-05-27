@@ -20,7 +20,10 @@
     "test:security": "node scripts/security-check.mjs",
     "test:rust": "cargo test --manifest-path src-tauri/Cargo.toml",
     "test:all": "npm run test:smoke && npm run test:unit && npm run test:security",
-    "audit:all": "npm run audit:npm && npm run test:security"
+    "audit:all": "npm run audit:npm && npm run test:security",
+    "clean": "node scripts/clean.mjs",
+    "quality": "npm run validate && npm run build && npm run audit:npm",
+    "release:check": "npm run quality && npm run check:rust && npm run test:rust"
   },
   "dependencies": {
     "@monaco-editor/react": "4.7.0",

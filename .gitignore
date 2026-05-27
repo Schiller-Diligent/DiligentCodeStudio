@@ -1,13 +1,37 @@
-﻿node_modules/
+# Dependencies
+node_modules/
+
+# Frontend build output
 dist/
 .vite/
 coverage/
 
+# Tauri / Rust build output
 target/
 src-tauri/target/
+src-tauri/gen/
 
+# Packaged release artifacts
 *.zip
+*.tar.gz
+*.AppImage
+*.msi
+*.exe
+*.dmg
+*.deb
+*.rpm
 *.sha256.txt
+checksums.txt
 
+# Local environment and logs
 .env
-.env.local
+.env.*
+!.env.example
+logs/
+*.log
+
+# OS / editor noise
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
