@@ -3364,7 +3364,7 @@ ERROR: ${String(error)}
           <div className="app-top-logo"><ShieldCheck size={18} /></div>
           <div>
             <strong>Diligent Code Studio</strong>
-            <span>Local-first AI development workbench • v0.7.0-dev</span>
+            <span>Local-first AI development workbench â€¢ v0.7.0-dev</span>
           </div>
         </div>
         <div className="app-health-strip" aria-label="Project health summary">
@@ -3386,7 +3386,7 @@ ERROR: ${String(error)}
           <div>
             <h1>Diligent Code Studio</h1>
             <p className="brand-tagline">Secure software-building workbench</p>
-            <p>Community Edition v0.6.10</p>
+            <p>Community Edition v0.7.0-dev</p>
           </div>
         </div>
 
@@ -3610,7 +3610,7 @@ ERROR: ${String(error)}
                   <FileCode2 size={14} />
                   <span className="dirty-dot" title={file.dirty ? 'Unsaved changes' : 'Saved'} />
                   {file.name}{file.dirty ? ' *' : ''}
-                  <span className="tab-close" onClick={(event) => { event.stopPropagation(); closeFile(file.path); }}>×</span>
+                  <span className="tab-close" onClick={(event) => { event.stopPropagation(); closeFile(file.path); }}>Ã—</span>
                 </button>
               ))}
             </nav>
@@ -3643,7 +3643,7 @@ ERROR: ${String(error)}
                     <div className="welcome-card editor-welcome-card">
                       <ShieldCheck size={48} />
                       <h2>Open a file to start editing.</h2>
-                      <p>Version 0.7.0-dev starts the First Run Setup Wizard track while keeping the streamlined Workspace Menu from v0.6.10.</p>
+                      <p>Version 0.7.0-dev starts the First Run Setup Wizard track while keeping the streamlined Workspace Menu from v0.7.0-dev.</p>
                       <div className="recent-files-card">
                         <div className="recent-files-header">
                           <strong>Recent Files</strong>
@@ -3890,7 +3890,7 @@ ERROR: ${String(error)}
               <div className="terminal-header">
                 <div>
                   <div className="panel-title"><TerminalSquare size={16} /> Terminal</div>
-                  <p title={terminalCwd}>Working directory: {terminalCwd} · Shell: {shellLabel(preferences.terminalShell)}</p>
+                  <p title={terminalCwd}>Working directory: {terminalCwd} Â· Shell: {shellLabel(preferences.terminalShell)}</p>
                 </div>
                 <div className="terminal-actions">
                   <button onClick={setTerminalToWorkspace}>Use Workspace</button>
@@ -3969,7 +3969,7 @@ ERROR: ${String(error)}
                 {gitStatus ? (
                   <div className="git-status-cards">
                     <div className="git-status-card"><span>Repository Root</span><strong title={gitStatus.git_root}>{gitStatus.git_root}</strong></div>
-                    <div className="git-status-card"><span>Branch</span><strong>{gitStatus.branch}{gitStatus.ahead_behind ? ` · ${gitStatus.ahead_behind}` : ''}</strong></div>
+                    <div className="git-status-card"><span>Branch</span><strong>{gitStatus.branch}{gitStatus.ahead_behind ? ` Â· ${gitStatus.ahead_behind}` : ''}</strong></div>
                     <div className="git-status-card"><span>Working Tree</span><strong className={gitStatus.clean ? 'ok-text' : 'warn-text'}>{gitStatus.clean ? 'Clean' : `${gitStatus.changed_files.length} changed file(s)`}</strong></div>
                   </div>
                 ) : !gitError ? (
@@ -4034,7 +4034,7 @@ ERROR: ${String(error)}
                         <code>{commit.hash}</code>
                         <div>
                           <strong>{commit.message}</strong>
-                          <span>{commit.date} · {commit.author}</span>
+                          <span>{commit.date} Â· {commit.author}</span>
                         </div>
                       </div>
                     ))
@@ -4387,7 +4387,7 @@ ERROR: ${String(error)}
                         <div className="registry-card-header">
                           <div>
                             <strong>{item.name}</strong>
-                            <span>{item.category} • {item.builtIn ? 'Built-in' : 'Custom'}</span>
+                            <span>{item.category} â€¢ {item.builtIn ? 'Built-in' : 'Custom'}</span>
                           </div>
                           <button className="secondary-button" onClick={() => toggleRegistryTool(item.id)} title="Enable or disable this registry tool">
                             {item.enabled ? <CheckCircle2 size={14} /> : <AlertTriangle size={14} />}
@@ -4536,7 +4536,7 @@ ERROR: ${String(error)}
                               <div className="setup-card-header">
                                 <div>
                                   <strong>{item.name}</strong>
-                                  <span>{item.required ? 'Required' : 'Optional'} • {item.command || 'No command check'}</span>
+                                  <span>{item.required ? 'Required' : 'Optional'} â€¢ {item.command || 'No command check'}</span>
                                 </div>
                                 <span className={`setup-status-pill ${item.available ? 'ok' : 'missing'}`}>
                                   {item.available ? <CheckCircle2 size={13} /> : <AlertTriangle size={13} />}
@@ -4961,7 +4961,7 @@ ERROR: ${String(error)}
                 <h2>Set up Diligent Code Studio</h2>
                 <p>Choose your starting preferences, verify required tools, configure optional AI support, and then open the workspace that matches what you want to do next.</p>
               </div>
-              <button className="icon-only-button" onClick={() => completeOnboarding()}>×</button>
+              <button className="icon-only-button" onClick={() => completeOnboarding()}>Ã—</button>
             </header>
 
             <div className="onboarding-progress-grid">
@@ -5063,7 +5063,7 @@ ERROR: ${String(error)}
             </div>
             <div className="assistant-pocket-window-actions">
               <button className="icon-only-button" onClick={resetAiHelpPosition} title="Reset AI Help position"><RefreshCw size={13} /></button>
-              <button className="icon-only-button" onClick={() => setAiDockOpen(false)} title="Close AI Help">×</button>
+              <button className="icon-only-button" onClick={() => setAiDockOpen(false)} title="Close AI Help">Ã—</button>
             </div>
           </div>
 

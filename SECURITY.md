@@ -24,7 +24,7 @@ Include:
 - Built-in checksum generation for release artifacts
 
 
-## v0.6.10 security foundation
+## v0.7.0-dev security foundation
 
 - OpenAI API keys are session-only and are redacted before preferences are saved.
 - `.aiignore` excludes common secret files, private keys, generated folders, and local databases from AI context workflows.

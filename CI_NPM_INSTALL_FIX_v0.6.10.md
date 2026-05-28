@@ -1,4 +1,4 @@
-# CI npm install fix — v0.6.10
+# CI npm install fix â€” v0.7.0-dev
 
 This update hardens the GitHub Actions npm install step after a failing job showed a network timeout while downloading `monaco-editor` and a Windows `EPERM` cleanup warning inside `node_modules`.
 

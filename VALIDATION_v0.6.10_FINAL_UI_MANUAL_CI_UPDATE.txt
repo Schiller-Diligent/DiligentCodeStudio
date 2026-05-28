@@ -1,4 +1,4 @@
-Diligent Code Studio v0.6.10 final UI/manual/CI update validation
+Diligent Code Studio v0.7.0-dev final UI/manual/CI update validation
 
 Date: May 27, 2026
 
@@ -7,7 +7,7 @@ Changes verified in source package:
 - Duplicate on-page What this page does / Guide Me guidance area was already removed in the prior cleanup.
 - Manual, Setup, and AI Help toolbar actions remain.
 - In-app manual stable path remains /manuals/DiligentCodeStudio_UserManual.pdf.
-- Bundled PDF manual replaced with Diligent Code Studio v0.6.10 Operator/User Manual Revision 1.1.
+- Bundled PDF manual replaced with Diligent Code Studio v0.7.0-dev Operator/User Manual Revision 1.1.
 - GitHub Actions npm registry/retry fix retained.
 
 Manual validation:

@@ -1,6 +1,6 @@
-# Diligent Code Studio v0.6.10 - Final UI, Manual, and CI Update
+# Diligent Code Studio v0.7.0-dev - Final UI, Manual, and CI Update
 
-This package is the GitHub-ready v0.6.10 cleanup update.
+This package is the GitHub-ready v0.7.0-dev cleanup update.
 
 ## Changes
 
@@ -8,7 +8,7 @@ This package is the GitHub-ready v0.6.10 cleanup update.
 - Removed the on-page duplicate **Guide Me** action.
 - Removed the top toolbar **Guide Me** action as requested.
 - Kept the **Manual**, **Setup**, and **AI Help** toolbar actions.
-- Replaced the bundled in-app PDF manual with the refreshed **Diligent Code Studio v0.6.10 Operator/User Manual**.
+- Replaced the bundled in-app PDF manual with the refreshed **Diligent Code Studio v0.7.0-dev Operator/User Manual**.
 - Kept the CI npm registry/retry fix for GitHub Actions.
 
 ## Notes

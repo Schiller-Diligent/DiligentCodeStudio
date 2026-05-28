@@ -1,4 +1,4 @@
-# Diligent Code Studio v0.6.10 Lockfile Registry Fix
+# Diligent Code Studio v0.7.0-dev Lockfile Registry Fix
 
 This hotfix corrects `package-lock.json` entries that still pointed to an internal/private npm registry even though npm was configured to use the public registry.
 

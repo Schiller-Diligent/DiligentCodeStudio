@@ -1,4 +1,4 @@
-# Final Patch: Remove Remaining Guide Me Text (v0.6.10)
+# Final Patch: Remove Remaining Guide Me Text (v0.7.0-dev)
 
 This package removes the remaining hidden `Guide me` prompt text from `src/App.tsx` so the GitHub update safety check passes.
 

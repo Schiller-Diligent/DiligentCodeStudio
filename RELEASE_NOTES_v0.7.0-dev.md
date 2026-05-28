@@ -19,7 +19,7 @@ v0.7.0-dev begins the First Run Setup Wizard improvement track.
 - Setup remains available from the top toolbar and wizard.
 - No top Guide Me button is restored.
 - No duplicate "What this page does" area is restored.
-- v0.6.10 clean workflow and CI protections remain the baseline.
+- v0.7.0-dev clean workflow and CI protections remain the baseline.
 
 ## Not yet complete
 

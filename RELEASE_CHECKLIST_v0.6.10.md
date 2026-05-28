@@ -1,4 +1,4 @@
-# Release Checklist - Diligent Code Studio v0.6.10
+# Release Checklist - Diligent Code Studio v0.7.0-dev
 
 Use this checklist before publishing a GitHub Release or uploading installers to the website.
 
@@ -45,7 +45,7 @@ For release uploads, save the hash output as `checksums.txt`.
 
 ## 7. Publish release assets
 
-Recommended v0.6.10 release assets:
+Recommended v0.7.0-dev release assets:
 
 - Windows MSI installer
 - Windows setup EXE

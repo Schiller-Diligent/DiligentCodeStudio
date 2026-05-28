@@ -1,4 +1,4 @@
-# Diligent Code Studio v0.6.10 - NPM Audit Fix
+# Diligent Code Studio v0.7.0-dev - NPM Audit Fix
 
 Version 0.6.10 resolves the npm audit failure caused by Monaco Editor pulling in a vulnerable DOMPurify dependency chain.
 
