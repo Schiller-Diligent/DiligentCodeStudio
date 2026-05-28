@@ -1,5 +1,6 @@
-import Editor from '@monaco-editor/react';
-import { invoke } from '@tauri-apps/api/core';
+import {
+  invoke
+} from '@tauri-apps/api/core';
 import {
   AlertTriangle,
   Bot,
@@ -18,23 +19,23 @@ import {
   Globe2,
   Hash,
   LayoutTemplate,
-  Maximize2,
-  Minimize2,
   PackageCheck,
   Play,
-  Rocket,
   RefreshCw,
+  Rocket,
   Save,
   SaveAll,
   Search,
   Send,
   Settings2,
-  SlidersHorizontal,
   ShieldCheck,
+  SlidersHorizontal,
   TerminalSquare,
   Trash2,
   Wrench,
+  X
 } from 'lucide-react';
+import Editor from '@monaco-editor/react';
 import { useEffect, useMemo, useRef, useState, type MouseEvent as ReactMouseEvent, type PointerEvent as ReactPointerEvent } from 'react';
 import { languageFromPath, languageLabelFromId, languageLabelFromPath, registerDiligentLanguages, supportedLanguageGroups } from './editorLanguages';
 import type { ActivityItem, DiagnosticProblem, DiagnosticRunResult, GitChangedFile, GitStatusInfo, OpenFile, ProjectInfo, ReleaseInfo, ReleasePackageResult, ProjectTemplate, ProjectTemplateResult, SearchResult, TerminalResult, ToolRegistryItem, ToolStatus, PlatformInfo, WorkspaceEntry, AiChatResponse, OllamaModelInfo, OllamaStatusInfo, SetupDependency } from './types';
@@ -371,7 +372,6 @@ function savePreferences(preferences: AppPreferences) {
   window.localStorage.setItem(PREFERENCES_STORAGE_KEY, JSON.stringify(redactSensitivePreferences(preferences), null, 2));
 }
 
-
 const TOOL_REGISTRY_STORAGE_KEY = 'diligent-code-studio.tool-registry.v1';
 
 const DEFAULT_TOOL_REGISTRY: ToolRegistryItem[] = [
@@ -552,7 +552,6 @@ function collapsedStorageKey(workspacePath: string): string {
   return `diligent-code-studio.collapsed-folders.${workspacePath.replace(/[^a-z0-9_-]+/gi, '_')}`;
 }
 
-
 type RecentFileItem = {
   path: string;
   name: string;
@@ -657,7 +656,6 @@ function findMatchesInText(
 
   return matches;
 }
-
 
 type OpenSourceCredit = {
   name: string;
@@ -812,7 +810,6 @@ export default function App() {
   const [setupInstallBusyId, setSetupInstallBusyId] = useState('');
   const [setupOutput, setSetupOutput] = useState('Setup & Dependencies ready. Use Check Again to refresh installed tools. Installer buttons ask for confirmation first.\n');
 
-
   const activeFile = useMemo(
     () => openFiles.find((file) => file.path === activePath) ?? null,
     [openFiles, activePath],
@@ -839,7 +836,6 @@ export default function App() {
     return { folders, files };
   }, [entries]);
 
-
   const registryCategories = useMemo(() => {
     const categories = [...new Set(toolRegistryItems.map((item) => item.category || 'Custom'))].sort();
     return ['All', ...categories];
@@ -857,8 +853,6 @@ export default function App() {
     const enabled = toolRegistryItems.filter((item) => item.enabled).length;
     return { builtIn, custom, enabled, total: toolRegistryItems.length };
   }, [toolRegistryItems]);
-
-
 
   const setupCategories = useMemo(() => {
     const categories: Record<string, SetupDependency[]> = {};
@@ -983,7 +977,6 @@ export default function App() {
     },
   ], [npmCommand]);
 
-
   function shellLabel(value: TerminalShellPreference): string {
     switch (value) {
       case 'auto': return platformInfo ? `Auto (${platformInfo.default_shell})` : 'Auto';
@@ -1080,7 +1073,6 @@ export default function App() {
     savePreferences(preferences);
   }, [preferences]);
 
-
   useEffect(() => {
     saveToolRegistry(toolRegistryItems);
   }, [toolRegistryItems]);
@@ -1168,7 +1160,6 @@ export default function App() {
     setActiveFindIndex((current) => Math.min(current, currentFileFindMatches.length - 1));
   }, [currentFileFindMatches.length]);
 
-
   useEffect(() => {
     if (!terminalOutputRef.current) return;
 
@@ -1195,7 +1186,6 @@ export default function App() {
       diagnosticsOutputRef.current.scrollTop = diagnosticsOutputRef.current.scrollHeight;
     });
   }, [diagnosticsOutput, activePage]);
-
 
   useEffect(() => {
     const handleBeforeUnload = (event: BeforeUnloadEvent) => {
@@ -1383,7 +1373,6 @@ export default function App() {
     }
   }
 
-
   function pageGuide(page: WorkspacePage) {
     switch (page) {
       case 'start':
@@ -1558,7 +1547,6 @@ export default function App() {
     setOnboardingOpen(true);
     log('warn', 'First Run Setup was reset and reopened.');
   }
-
 
   function rememberRecentFile(path: string, language: string) {
     const item: RecentFileItem = {
@@ -1736,7 +1724,6 @@ export default function App() {
       log('error', `Could not open ${item.name} website: ${String(error)}`);
     }
   }
-
 
   async function openOpenSourceCredit(credit: OpenSourceCredit) {
     try {
@@ -1993,7 +1980,6 @@ export default function App() {
       ),
     );
   }
-
 
   function handleEditorBeforeMount(monaco: any) {
     registerDiligentLanguages(monaco);
@@ -2328,7 +2314,6 @@ export default function App() {
     log('info', 'Search results cleared.');
   }
 
-
   async function runDiagnostics() {
     if (!workspacePath.trim()) {
       log('warn', 'Choose a workspace before running diagnostics.');
@@ -2384,7 +2369,6 @@ ERROR: ${message}
     setDiagnosticsOutput('Problems cleared. Run diagnostics to refresh.\n');
     log('info', 'Problems page cleared.');
   }
-
 
   function projectContextText(): string {
     const fileEntries = entries
@@ -2480,7 +2464,6 @@ ERROR: ${message}
     ].join('\n');
   }
 
-
   function aiContextText(): string {
     switch (aiContextMode) {
       case 'selection': {
@@ -2536,7 +2519,6 @@ ERROR: ${message}
         break;
     }
   }
-
 
   function selectedEditorText(): string {
     const selection = editorRef.current?.getSelection?.();
@@ -2641,7 +2623,6 @@ ERROR: ${message}
     setActivePage('ai');
     log('info', `Prepared project-aware AI action: ${action}. Review the prompt in the AI Coding Assistant window, then click Ask AI.`);
   }
-
 
   function aiCommentText(text: string, language?: string): string {
     const cleaned = text.trim();
@@ -2846,7 +2827,6 @@ ERROR: ${message}
     log('info', 'Inserted AI response into the active editor. Review before saving.');
   }
 
-
   function prepareWebBuilderCommand(command: string) {
     const target = workspacePath.trim() || terminalCwd.trim();
     setTerminalCwd(target);
@@ -2931,7 +2911,6 @@ ERROR: ${String(error)}
       setTerminalRunning(false);
     }
   }
-
 
   function updateRegistryDraft<K extends keyof ToolRegistryItem>(key: K, value: ToolRegistryItem[K]) {
     setRegistryDraft((current) => ({ ...current, [key]: value }));
@@ -3333,7 +3312,6 @@ ERROR: ${String(error)}
     }
   }
 
-
   function beginAiHelpDrag(event: ReactPointerEvent<HTMLDivElement>): void {
     if (event.button !== 0) return;
     const target = event.target as HTMLElement | null;
@@ -3406,7 +3384,7 @@ ERROR: ${String(error)}
           <div className="app-top-logo"><ShieldCheck size={18} /></div>
           <div>
             <strong>Diligent Code Studio</strong>
-            <span>Local-first AI development workbench Ã¢â‚¬Â¢ v0.7.0-dev</span>
+            <span>Local-first AI development workbench ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Â¦Ãƒâ€šÃ‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ v0.7.0-dev</span>
           </div>
         </div>
         <div className="app-health-strip" aria-label="Project health summary">
@@ -3431,7 +3409,6 @@ ERROR: ${String(error)}
             <p>Community Edition v0.7.0-dev</p>
           </div>
         </div>
-
 
         <section className="panel workspace-panel">
           <div className="panel-title"><FolderOpen size={16} /> Workspace</div>
@@ -3557,7 +3534,6 @@ ERROR: ${String(error)}
           </div>
         </header>
 
-
         {activePage === 'start' && (
           <section className="page-content utility-page start-page">
             <div className="start-hero panel">
@@ -3652,7 +3628,7 @@ ERROR: ${String(error)}
                   <FileCode2 size={14} />
                   <span className="dirty-dot" title={file.dirty ? 'Unsaved changes' : 'Saved'} />
                   {file.name}{file.dirty ? ' *' : ''}
-                  <span className="tab-close" onClick={(event) => { event.stopPropagation(); closeFile(file.path); }}>Ãƒâ€”</span>
+                  <span className="tab-close" onClick={(event) => { event.stopPropagation(); closeFile(file.path); }}>ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â</span>
                 </button>
               ))}
             </nav>
@@ -3722,7 +3698,6 @@ ERROR: ${String(error)}
             </div>
           </section>
         )}
-
 
         {activePage === 'ai' && (
           <section className="page-content utility-page ai-page">
@@ -3932,7 +3907,7 @@ ERROR: ${String(error)}
               <div className="terminal-header">
                 <div>
                   <div className="panel-title"><TerminalSquare size={16} /> Terminal</div>
-                  <p title={terminalCwd}>Working directory: {terminalCwd} Ã‚Â· Shell: {shellLabel(preferences.terminalShell)}</p>
+                  <p title={terminalCwd}>Working directory: {terminalCwd} ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Â¦Ãƒâ€šÃ‚Â¡ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â· Shell: {shellLabel(preferences.terminalShell)}</p>
                 </div>
                 <div className="terminal-actions">
                   <button onClick={setTerminalToWorkspace}>Use Workspace</button>
@@ -4011,7 +3986,7 @@ ERROR: ${String(error)}
                 {gitStatus ? (
                   <div className="git-status-cards">
                     <div className="git-status-card"><span>Repository Root</span><strong title={gitStatus.git_root}>{gitStatus.git_root}</strong></div>
-                    <div className="git-status-card"><span>Branch</span><strong>{gitStatus.branch}{gitStatus.ahead_behind ? ` Ã‚Â· ${gitStatus.ahead_behind}` : ''}</strong></div>
+                    <div className="git-status-card"><span>Branch</span><strong>{gitStatus.branch}{gitStatus.ahead_behind ? ` ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Â¦Ãƒâ€šÃ‚Â¡ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â· ${gitStatus.ahead_behind}` : ''}</strong></div>
                     <div className="git-status-card"><span>Working Tree</span><strong className={gitStatus.clean ? 'ok-text' : 'warn-text'}>{gitStatus.clean ? 'Clean' : `${gitStatus.changed_files.length} changed file(s)`}</strong></div>
                   </div>
                 ) : !gitError ? (
@@ -4076,7 +4051,7 @@ ERROR: ${String(error)}
                         <code>{commit.hash}</code>
                         <div>
                           <strong>{commit.message}</strong>
-                          <span>{commit.date} Ã‚Â· {commit.author}</span>
+                          <span>{commit.date} ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Â¦Ãƒâ€šÃ‚Â¡ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â· {commit.author}</span>
                         </div>
                       </div>
                     ))
@@ -4370,7 +4345,6 @@ ERROR: ${String(error)}
           </section>
         )}
 
-
         {activePage === 'registry' && (
           <section className="page-content utility-page registry-page">
             <div className="registry-layout">
@@ -4429,7 +4403,7 @@ ERROR: ${String(error)}
                         <div className="registry-card-header">
                           <div>
                             <strong>{item.name}</strong>
-                            <span>{item.category} Ã¢â‚¬Â¢ {item.builtIn ? 'Built-in' : 'Custom'}</span>
+                            <span>{item.category} ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Â¦Ãƒâ€šÃ‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ {item.builtIn ? 'Built-in' : 'Custom'}</span>
                           </div>
                           <button className="secondary-button" onClick={() => toggleRegistryTool(item.id)} title="Enable or disable this registry tool">
                             {item.enabled ? <CheckCircle2 size={14} /> : <AlertTriangle size={14} />}
@@ -4450,7 +4424,6 @@ ERROR: ${String(error)}
             </div>
           </section>
         )}
-
 
         {activePage === 'web' && (
           <section className="page-content utility-page web-builder-page">
@@ -4578,7 +4551,7 @@ ERROR: ${String(error)}
                               <div className="setup-card-header">
                                 <div>
                                   <strong>{item.name}</strong>
-                                  <span>{item.required ? 'Required' : 'Optional'} Ã¢â‚¬Â¢ {item.command || 'No command check'}</span>
+                                  <span>{item.required ? 'Required' : 'Optional'} ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Â¦Ãƒâ€šÃ‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ {item.command || 'No command check'}</span>
                                 </div>
                                 <span className={`setup-status-pill ${item.available ? 'ok' : 'missing'}`}>
                                   {item.available ? <CheckCircle2 size={13} /> : <AlertTriangle size={13} />}
@@ -4607,7 +4580,6 @@ ERROR: ${String(error)}
             </div>
           </section>
         )}
-
 
         {activePage === 'project' && (
           <section className="page-content utility-page project-page">
@@ -4713,7 +4685,6 @@ ERROR: ${String(error)}
             </div>
           </section>
         )}
-
 
         {activePage === 'credits' && (
           <section className="page-content utility-page credits-page">
@@ -4846,7 +4817,6 @@ ERROR: ${String(error)}
                   Remember collapsed/expanded folders per workspace
                 </label>
               </section>
-
 
               <section className="panel settings-panel wide-settings-panel">
                 <div className="panel-title"><Bot size={16} /> AI Assistant</div>
@@ -4993,7 +4963,6 @@ ERROR: ${String(error)}
 
       </section>
 
-
       {onboardingOpen && (
         <section className="onboarding-overlay" role="dialog" aria-modal="true" aria-label="First Run Setup Wizard">
           <div className="onboarding-dialog first-run-wizard-dialog">
@@ -5003,7 +4972,7 @@ ERROR: ${String(error)}
                 <h2>Set up Diligent Code Studio</h2>
                 <p>Choose your starting preferences, verify required tools, configure optional AI support, and then open the workspace that matches what you want to do next.</p>
               </div>
-              <button className="icon-only-button" onClick={() => completeOnboarding()}>Ãƒâ€”</button>
+              <button className="icon-only-button" onClick={() => completeOnboarding()} title="Close First Run Setup" aria-label="Close First Run Setup"><X size={16} /></button>
             </header>
 
             <div className="onboarding-progress-grid">
@@ -5083,7 +5052,6 @@ ERROR: ${String(error)}
         </section>
       )}
 
-
       {aiDockOpen && (
         <aside
           ref={assistantPocketRef}
@@ -5105,7 +5073,7 @@ ERROR: ${String(error)}
             </div>
             <div className="assistant-pocket-window-actions">
               <button className="icon-only-button" onClick={resetAiHelpPosition} title="Reset AI Help position"><RefreshCw size={13} /></button>
-              <button className="icon-only-button" onClick={() => setAiDockOpen(false)} title="Close AI Help">Ãƒâ€”</button>
+              <button className="icon-only-button" onClick={() => setAiDockOpen(false)} title="Close AI Help" aria-label="Close AI Help"><X size={16} /></button>
             </div>
           </div>
 
