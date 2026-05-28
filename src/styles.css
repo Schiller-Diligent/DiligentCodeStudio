@@ -3981,7 +3981,7 @@ body {
 }
 
 
-/* v0.4.9 Workspace Menu fixed top area ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬" no horizontal scrolling */
+/* v0.4.9 Workspace Menu fixed top area ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬" no horizontal scrolling */
 .workspace-menu-shell {
   min-height: auto;
   display: flex;
@@ -6002,3 +6002,168 @@ body {
   }
 }
 /* DCS v0.7.0 editor max-area default end */
+
+/* DCS v0.7.0 compact editor footer start */
+/*
+  Editor page footer/status-area cleanup:
+  The editor should own the vertical space. Footer/status/output areas should stay compact by default.
+*/
+
+.editor-page footer,
+.page-content.editor-page footer,
+.editor-page .footer,
+.page-content.editor-page .footer,
+.editor-page .app-footer,
+.page-content.editor-page .app-footer,
+.editor-page .status-footer,
+.page-content.editor-page .status-footer,
+.editor-page .statusbar,
+.page-content.editor-page .statusbar,
+.editor-page .status-bar,
+.page-content.editor-page .status-bar,
+.editor-page .editor-footer,
+.page-content.editor-page .editor-footer,
+.editor-page .editor-status-bar,
+.page-content.editor-page .editor-status-bar {
+  flex: 0 0 auto;
+  min-height: 26px;
+  max-height: 40px;
+  padding: 4px 8px;
+  font-size: 12px;
+  line-height: 1.2;
+  overflow: hidden;
+}
+
+/* Keep footer/status text from becoming multi-line and consuming editor height. */
+.editor-page footer *,
+.page-content.editor-page footer *,
+.editor-page .footer *,
+.page-content.editor-page .footer *,
+.editor-page .status-footer *,
+.page-content.editor-page .status-footer *,
+.editor-page .statusbar *,
+.page-content.editor-page .statusbar *,
+.editor-page .status-bar *,
+.page-content.editor-page .status-bar *,
+.editor-page .editor-footer *,
+.page-content.editor-page .editor-footer *,
+.editor-page .editor-status-bar *,
+.page-content.editor-page .editor-status-bar * {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Editor page bottom/output panels should not dominate by default. They remain resizable if needed. */
+.editor-page .bottom-panel,
+.page-content.editor-page .bottom-panel,
+.editor-page .output-panel,
+.page-content.editor-page .output-panel,
+.editor-page .activity-log,
+.page-content.editor-page .activity-log,
+.editor-page .terminal-output,
+.page-content.editor-page .terminal-output,
+.editor-page .diagnostics-output,
+.page-content.editor-page .diagnostics-output,
+.editor-page .ai-output,
+.page-content.editor-page .ai-output,
+.editor-page .ai-response,
+.page-content.editor-page .ai-response,
+.editor-page .log-output,
+.page-content.editor-page .log-output {
+  flex: 0 1 auto;
+  min-height: 72px;
+  max-height: 140px;
+  padding: 8px 10px;
+  font-size: 12px;
+  line-height: 1.35;
+  overflow: auto;
+}
+
+/* Reduce extra note/helper text spacing on the Editor page. */
+.editor-page .muted-note,
+.page-content.editor-page .muted-note,
+.editor-page .helper-text,
+.page-content.editor-page .helper-text,
+.editor-page .hint-text,
+.page-content.editor-page .hint-text {
+  margin-top: 3px;
+  margin-bottom: 4px;
+  font-size: 12px;
+  line-height: 1.3;
+}
+
+/* Keep action rows compact so they do not push the editor down. */
+.editor-page .editor-actions,
+.page-content.editor-page .editor-actions,
+.editor-page .file-actions,
+.page-content.editor-page .file-actions,
+.editor-page .toolbar,
+.page-content.editor-page .toolbar,
+.editor-page .button-row,
+.page-content.editor-page .button-row {
+  gap: 6px;
+  padding-top: 4px;
+  padding-bottom: 4px;
+  min-height: 30px;
+}
+
+/* Buttons in editor footer/status/action areas should be compact. */
+.editor-page .editor-actions button,
+.page-content.editor-page .editor-actions button,
+.editor-page .file-actions button,
+.page-content.editor-page .file-actions button,
+.editor-page footer button,
+.page-content.editor-page footer button,
+.editor-page .footer button,
+.page-content.editor-page .footer button,
+.editor-page .statusbar button,
+.page-content.editor-page .statusbar button,
+.editor-page .status-bar button,
+.page-content.editor-page .status-bar button {
+  min-height: 26px;
+  padding: 4px 8px;
+  font-size: 12px;
+}
+
+/* If the app has a global footer below the page, keep it compact while editing. */
+.app-shell:has(.editor-page) > footer,
+.app-shell:has(.page-content.editor-page) > footer,
+.app-layout:has(.editor-page) > footer,
+.app-layout:has(.page-content.editor-page) > footer {
+  min-height: 24px;
+  max-height: 34px;
+  padding: 3px 8px;
+  font-size: 12px;
+  overflow: hidden;
+}
+
+/* Compact mode trims a little more. */
+.compact-mode .editor-page footer,
+.compact-mode .page-content.editor-page footer,
+.compact-mode .editor-page .footer,
+.compact-mode .page-content.editor-page .footer,
+.compact-mode .editor-page .statusbar,
+.compact-mode .page-content.editor-page .statusbar,
+.compact-mode .editor-page .status-bar,
+.compact-mode .page-content.editor-page .status-bar,
+.compact-mode .editor-page .editor-footer,
+.compact-mode .page-content.editor-page .editor-footer {
+  min-height: 22px;
+  max-height: 32px;
+  padding: 3px 6px;
+  font-size: 11px;
+}
+
+.compact-mode .editor-page .bottom-panel,
+.compact-mode .page-content.editor-page .bottom-panel,
+.compact-mode .editor-page .output-panel,
+.compact-mode .page-content.editor-page .output-panel,
+.compact-mode .editor-page .terminal-output,
+.compact-mode .page-content.editor-page .terminal-output,
+.compact-mode .editor-page .activity-log,
+.compact-mode .page-content.editor-page .activity-log {
+  min-height: 56px;
+  max-height: 110px;
+}
+/* DCS v0.7.0 compact editor footer end */
