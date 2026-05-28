@@ -3981,7 +3981,7 @@ body {
 }
 
 
-/* v0.4.9 Workspace Menu fixed top area Ã¢â‚¬" no horizontal scrolling */
+/* v0.4.9 Workspace Menu fixed top area ÃƒÂ¢Ã¢â€šÂ¬" no horizontal scrolling */
 .workspace-menu-shell {
   min-height: auto;
   display: flex;
@@ -5748,3 +5748,131 @@ body {
     height: 360px;
   }
 }
+
+/* DCS v0.7.0 resizable editor panes start */
+/*
+  Editor page usability upgrade:
+  - Workspace/project panel can be widened or narrowed.
+  - Editor/code panels can be resized vertically.
+  - Output/log/editor-adjacent panels can be resized when visible.
+  This uses native CSS resize handles so it is low-risk and does not change React logic.
+*/
+
+.workspace-panel {
+  resize: horizontal;
+  overflow: auto;
+  min-width: 240px;
+  max-width: 720px;
+}
+
+/* Keep the workspace panel from shrinking the rest of the app to nothing. */
+.app-shell:has(.workspace-panel),
+.app-layout:has(.workspace-panel),
+.main-layout:has(.workspace-panel),
+.workspace-shell:has(.workspace-panel) {
+  min-width: 0;
+}
+
+/* Editor-area panels can grow taller when more coding space is needed. */
+.page-content.editor-page .panel,
+.editor-page .panel,
+.panel:has(.monaco-editor),
+.panel:has(.code-editor),
+.panel:has(.editor-textarea),
+.panel:has(.code-textarea),
+.panel:has(textarea) {
+  resize: vertical;
+  overflow: auto;
+}
+
+/* The actual code surface should also be vertically resizable. */
+.monaco-editor-shell,
+.monaco-editor-container,
+.monaco-container,
+.code-editor,
+.editor-textarea,
+.code-textarea,
+.editor-page textarea,
+.code-editor-panel textarea,
+.editor-panel textarea {
+  resize: vertical;
+  overflow: auto;
+  min-height: 420px;
+  max-height: calc(100vh - 140px);
+}
+
+/* Bottom/output style panes can be resized both ways when present. */
+.terminal-output,
+.setup-output,
+.diagnostics-output,
+.release-output,
+.ai-response,
+.ai-output,
+.output-panel,
+.bottom-panel,
+.activity-log,
+.log-output {
+  resize: both;
+  overflow: auto;
+  min-height: 140px;
+  max-height: calc(100vh - 180px);
+}
+
+/* Make resize handles easier to discover without adding visual clutter. */
+.workspace-panel,
+.page-content.editor-page .panel,
+.editor-page .panel,
+.monaco-editor-shell,
+.monaco-editor-container,
+.monaco-container,
+.code-editor,
+.editor-textarea,
+.code-textarea,
+.terminal-output,
+.setup-output,
+.diagnostics-output,
+.release-output,
+.ai-response,
+.ai-output,
+.output-panel,
+.bottom-panel,
+.activity-log,
+.log-output {
+  scrollbar-gutter: stable;
+}
+
+/* Compact mode keeps the handles but uses smaller minimums. */
+.compact-mode .workspace-panel {
+  min-width: 210px;
+  max-width: 620px;
+}
+
+.compact-mode .monaco-editor-shell,
+.compact-mode .monaco-editor-container,
+.compact-mode .monaco-container,
+.compact-mode .code-editor,
+.compact-mode .editor-textarea,
+.compact-mode .code-textarea,
+.compact-mode .editor-page textarea {
+  min-height: 340px;
+}
+
+/* Very small screens: keep panes usable and prevent accidental overflow. */
+@media (max-width: 900px) {
+  .workspace-panel {
+    resize: vertical;
+    min-width: 100%;
+    max-width: 100%;
+  }
+
+  .monaco-editor-shell,
+  .monaco-editor-container,
+  .monaco-container,
+  .code-editor,
+  .editor-textarea,
+  .code-textarea,
+  .editor-page textarea {
+    min-height: 320px;
+  }
+}
+/* DCS v0.7.0 resizable editor panes end */
