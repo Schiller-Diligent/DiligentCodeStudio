@@ -3972,7 +3972,7 @@ body {
   box-shadow: 0 0 0 1px rgba(96, 165, 250, 0.18), 0 10px 24px rgba(15, 23, 42, 0.18);
 }
 
-/* v0.4.9 Workspace Menu fixed top area ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Â¦Ãƒâ€šÃ‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬" no horizontal scrolling */
+/* v0.4.9 Workspace Menu fixed top area ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¦ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¡ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬" no horizontal scrolling */
 .workspace-menu-shell {
   min-height: auto;
   display: flex;
@@ -5624,533 +5624,168 @@ body {
   border-color: rgba(37, 99, 235, 0.22);
 }
 
-/* DCS v0.7.0 editor usable height fix */
-.main-area,
-.page-mode,
-.page-content {
+/* DCS v0.7.0 targeted editor max layout start */
+/*
+  Targeted Editor layout fix based on actual markup:
+  App.tsx uses:
+    .editor-page-content
+      .tabs
+      .editor-wrap
+        .editor-ai-layout
+          .editor-canvas
+            Monaco <Editor height="100%" />
+      .editor-footer-strip
+
+  Goal:
+  - Editor opens maximized by default.
+  - Footer/status strip stays one-line and compact.
+  - Footer/status strip can be manually dragged taller if needed.
+  - No global app-shell/status/header rules are changed.
+*/
+
+.editor-page-content {
+  display: grid;
+  grid-template-rows: 32px minmax(0, 1fr) 28px;
   min-height: 0;
+  height: 100%;
+  overflow: hidden;
 }
 
-.page-content.editor-page,
-.editor-page,
-.editor-layout,
-.editor-shell,
-.editor-workspace,
-.editor-main,
-.editor-main-panel,
-.editor-panel,
-.editor-pane,
-.editor-container,
-.editor-host,
-.editor-surface,
-.code-editor-panel,
-.code-editor-shell,
-.code-editor-container,
-.monaco-editor-shell,
-.monaco-editor-container,
-.monaco-container {
-  min-height: 0;
+.editor-page-content.no-open-tabs {
+  grid-template-rows: minmax(0, 1fr) 28px;
 }
 
-/* Give the actual coding surface a real working height instead of collapsing to one line. */
-.editor-page,
-.page-content.editor-page,
-.page-content:has(.monaco-editor),
-.page-content:has(.code-editor),
-.page-content:has(.editor-textarea),
-.panel:has(.monaco-editor),
-.panel:has(.code-editor),
-.panel:has(.editor-textarea) {
+.editor-page-content .tabs {
+  min-height: 0;
+  height: 32px;
+  max-height: 32px;
+  overflow: hidden;
+}
+
+.editor-page-content.tabs-empty .tabs,
+.editor-page-content.no-open-tabs .tabs {
+  display: none;
+}
+
+.editor-page-content .editor-wrap {
+  min-height: 0;
+  height: 100%;
+  overflow: hidden;
   display: flex;
   flex-direction: column;
-  min-height: calc(100vh - 180px);
+  padding: 0;
 }
 
-/* Monaco needs a parent with height before it can lay itself out correctly. */
-.monaco-editor,
-.monaco-editor .overflow-guard,
-.monaco-editor-background,
-.monaco-editor-shell,
-.monaco-editor-container,
-.monaco-container,
-.code-editor,
-.editor-textarea,
-.code-textarea,
-.editor-page textarea,
-.code-editor-panel textarea,
-.editor-panel textarea {
-  min-height: 520px;
+.editor-page-content.no-open-tabs .editor-wrap {
+  overflow: auto;
+  padding: 16px 18px;
 }
 
-/* Prefer responsive height when the window is taller. */
-.monaco-editor-shell,
-.monaco-editor-container,
-.monaco-container,
-.code-editor,
-.editor-textarea,
-.code-textarea,
-.editor-page textarea,
-.code-editor-panel textarea,
-.editor-panel textarea {
-  height: clamp(520px, calc(100vh - 260px), 1100px);
-}
-
-/* Let the editor area grow instead of being squeezed by sibling panels. */
-.editor-page .panel,
-.page-content.editor-page .panel,
-.code-editor-panel,
-.editor-panel,
-.monaco-editor-shell,
-.monaco-editor-container,
-.monaco-container {
+.editor-page-content:not(.no-open-tabs) .editor-ai-layout,
+.editor-page-content:not(.no-open-tabs) .editor-canvas {
+  min-height: 0;
+  height: 100%;
   flex: 1 1 auto;
 }
 
-/* Keep compact mode usable too. */
-.compact-mode .monaco-editor,
-.compact-mode .monaco-editor-shell,
-.compact-mode .monaco-editor-container,
-.compact-mode .monaco-container,
-.compact-mode .code-editor,
-.compact-mode .editor-textarea,
-.compact-mode .code-textarea,
-.compact-mode .editor-page textarea {
-  min-height: 460px;
-  height: clamp(460px, calc(100vh - 230px), 1000px);
+.editor-page-content:not(.no-open-tabs) .editor-ai-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr);
+  overflow: hidden;
 }
 
-/* On shorter screens, still show more than a single line. */
-@media (max-height: 760px) {
-  .monaco-editor,
-  .monaco-editor-shell,
-  .monaco-editor-container,
-  .monaco-container,
-  .code-editor,
-  .editor-textarea,
-  .code-textarea,
-  .editor-page textarea,
-  .code-editor-panel textarea,
-  .editor-panel textarea {
-    min-height: 360px;
-    height: 360px;
-  }
+.editor-page-content:not(.no-open-tabs) .editor-canvas {
+  display: flex;
+  width: 100%;
+  overflow: hidden;
 }
 
-/* DCS v0.7.0 resizable editor panes start */
-/*
-  Editor page usability upgrade:
-  - Workspace/project panel can be widened or narrowed.
-  - Editor/code panels can be resized vertically.
-  - Output/log/editor-adjacent panels can be resized when visible.
-  This uses native CSS resize handles so it is low-risk and does not change React logic.
-*/
-
-.workspace-panel {
-  resize: horizontal;
-  overflow: auto;
-  min-width: 240px;
-  max-width: 720px;
+.editor-page-content:not(.no-open-tabs) .editor-canvas > div {
+  flex: 1 1 auto;
+  min-height: 0 !important;
+  height: 100% !important;
+  width: 100% !important;
 }
 
-/* Keep the workspace panel from shrinking the rest of the app to nothing. */
-.app-shell:has(.workspace-panel),
-.app-layout:has(.workspace-panel),
-.main-layout:has(.workspace-panel),
-.workspace-shell:has(.workspace-panel) {
-  min-width: 0;
+.editor-page-content:not(.no-open-tabs) .monaco-editor,
+.editor-page-content:not(.no-open-tabs) .monaco-editor .overflow-guard,
+.editor-page-content:not(.no-open-tabs) .monaco-editor-background {
+  min-height: 0 !important;
+  height: 100% !important;
 }
 
-/* Editor-area panels can grow taller when more coding space is needed. */
-.page-content.editor-page .panel,
-.editor-page .panel,
-.panel:has(.monaco-editor),
-.panel:has(.code-editor),
-.panel:has(.editor-textarea),
-.panel:has(.code-textarea),
-.panel:has(textarea) {
+/* Compact one-line status strip. Users can drag it taller from the resize handle if they need the full path/hash. */
+.editor-page-content .editor-footer-strip {
+  height: 28px;
+  min-height: 28px;
+  max-height: 160px;
+  padding: 4px 10px;
+  gap: 10px;
   resize: vertical;
   overflow: auto;
-}
-
-/* The actual code surface should also be vertically resizable. */
-.monaco-editor-shell,
-.monaco-editor-container,
-.monaco-container,
-.code-editor,
-.editor-textarea,
-.code-textarea,
-.editor-page textarea,
-.code-editor-panel textarea,
-.editor-panel textarea {
-  resize: vertical;
-  overflow: auto;
-  min-height: 420px;
-  max-height: calc(100vh - 140px);
-}
-
-/* Bottom/output style panes can be resized both ways when present. */
-.terminal-output,
-.setup-output,
-.diagnostics-output,
-.release-output,
-.ai-response,
-.ai-output,
-.output-panel,
-.bottom-panel,
-.activity-log,
-.log-output {
-  resize: both;
-  overflow: auto;
-  min-height: 140px;
-  max-height: calc(100vh - 180px);
-}
-
-/* Make resize handles easier to discover without adding visual clutter. */
-.workspace-panel,
-.page-content.editor-page .panel,
-.editor-page .panel,
-.monaco-editor-shell,
-.monaco-editor-container,
-.monaco-container,
-.code-editor,
-.editor-textarea,
-.code-textarea,
-.terminal-output,
-.setup-output,
-.diagnostics-output,
-.release-output,
-.ai-response,
-.ai-output,
-.output-panel,
-.bottom-panel,
-.activity-log,
-.log-output {
+  align-content: center;
   scrollbar-gutter: stable;
 }
 
-/* Compact mode keeps the handles but uses smaller minimums. */
-.compact-mode .workspace-panel {
-  min-width: 210px;
-  max-width: 620px;
-}
-
-.compact-mode .monaco-editor-shell,
-.compact-mode .monaco-editor-container,
-.compact-mode .monaco-container,
-.compact-mode .code-editor,
-.compact-mode .editor-textarea,
-.compact-mode .code-textarea,
-.compact-mode .editor-page textarea {
-  min-height: 340px;
-}
-
-/* Very small screens: keep panes usable and prevent accidental overflow. */
-@media (max-width: 900px) {
-  .workspace-panel {
-    resize: vertical;
-    min-width: 100%;
-    max-width: 100%;
-  }
-
-  .monaco-editor-shell,
-  .monaco-editor-container,
-  .monaco-container,
-  .code-editor,
-  .editor-textarea,
-  .code-textarea,
-  .editor-page textarea {
-    min-height: 320px;
-  }
-}
-/* DCS v0.7.0 resizable editor panes end */
-
-/* DCS v0.7.0 editor max-area default start */
-/*
-  Editor page default layout:
-  The code editor should open large by default. Users can still resize panes manually.
-*/
-
-:root {
-  --dcs-editor-default-height: clamp(620px, calc(100vh - 210px), 1200px);
-  --dcs-editor-compact-default-height: clamp(540px, calc(100vh - 190px), 1100px);
-}
-
-/* Keep surrounding editor chrome compact so the code area gets priority. */
-.page-content.editor-page,
-.editor-page {
-  min-height: calc(100vh - 150px);
-}
-
-.editor-page .page-title-block,
-.page-content.editor-page .page-title-block,
-.editor-page .panel-title,
-.page-content.editor-page .panel-title {
-  margin-bottom: 6px;
-}
-
-.editor-page .muted-note,
-.page-content.editor-page .muted-note {
-  margin-top: 4px;
-  margin-bottom: 6px;
-}
-
-/* Make the actual editor/code surface large by default. */
-.editor-page .monaco-editor-shell,
-.editor-page .monaco-editor-container,
-.editor-page .monaco-container,
-.editor-page .monaco-editor,
-.editor-page .code-editor,
-.editor-page .editor-textarea,
-.editor-page .code-textarea,
-.editor-page textarea,
-.page-content.editor-page .monaco-editor-shell,
-.page-content.editor-page .monaco-editor-container,
-.page-content.editor-page .monaco-container,
-.page-content.editor-page .monaco-editor,
-.page-content.editor-page .code-editor,
-.page-content.editor-page .editor-textarea,
-.page-content.editor-page .code-textarea,
-.page-content.editor-page textarea,
-.panel:has(.monaco-editor) .monaco-editor,
-.panel:has(.monaco-editor) .overflow-guard,
-.panel:has(.editor-textarea) .editor-textarea,
-.panel:has(.code-textarea) .code-textarea {
-  min-height: var(--dcs-editor-default-height);
-  height: var(--dcs-editor-default-height);
-}
-
-/* If the editor has a toolbar/actions row, keep it compact. */
-.editor-page .editor-actions,
-.editor-page .file-actions,
-.editor-page .tab-strip,
-.editor-page .editor-tabs,
-.editor-page .toolbar,
-.page-content.editor-page .editor-actions,
-.page-content.editor-page .file-actions,
-.page-content.editor-page .tab-strip,
-.page-content.editor-page .editor-tabs,
-.page-content.editor-page .toolbar {
-  flex: 0 0 auto;
-}
-
-/* Keep the editor itself growing instead of sibling notes/logs stealing the page. */
-.editor-page .editor-panel,
-.editor-page .code-editor-panel,
-.editor-page .editor-container,
-.editor-page .editor-shell,
-.page-content.editor-page .editor-panel,
-.page-content.editor-page .code-editor-panel,
-.page-content.editor-page .editor-container,
-.page-content.editor-page .editor-shell,
-.panel:has(.monaco-editor),
-.panel:has(.editor-textarea),
-.panel:has(.code-textarea) {
-  flex: 1 1 auto;
-}
-
-/* Left workspace panel should remain useful but not dominate the editor. */
-.workspace-panel {
-  flex: 0 0 clamp(260px, 22vw, 380px);
-}
-
-/* Compact mode still defaults to a large editor, just slightly smaller. */
-.compact-mode .editor-page .monaco-editor-shell,
-.compact-mode .editor-page .monaco-editor-container,
-.compact-mode .editor-page .monaco-container,
-.compact-mode .editor-page .monaco-editor,
-.compact-mode .editor-page .code-editor,
-.compact-mode .editor-page .editor-textarea,
-.compact-mode .editor-page .code-textarea,
-.compact-mode .editor-page textarea,
-.compact-mode .page-content.editor-page .monaco-editor-shell,
-.compact-mode .page-content.editor-page .monaco-editor-container,
-.compact-mode .page-content.editor-page .monaco-container,
-.compact-mode .page-content.editor-page .monaco-editor,
-.compact-mode .page-content.editor-page .code-editor,
-.compact-mode .page-content.editor-page .editor-textarea,
-.compact-mode .page-content.editor-page .code-textarea,
-.compact-mode .page-content.editor-page textarea {
-  min-height: var(--dcs-editor-compact-default-height);
-  height: var(--dcs-editor-compact-default-height);
-}
-
-/* On short screens, still show a practical amount of code. */
-@media (max-height: 760px) {
-  :root {
-    --dcs-editor-default-height: 460px;
-    --dcs-editor-compact-default-height: 420px;
-  }
-}
-
-@media (max-height: 620px) {
-  :root {
-    --dcs-editor-default-height: 360px;
-    --dcs-editor-compact-default-height: 340px;
-  }
-}
-/* DCS v0.7.0 editor max-area default end */
-
-/* DCS v0.7.0 compact editor footer start */
-/*
-  Editor page footer/status-area cleanup:
-  The editor should own the vertical space. Footer/status/output areas should stay compact by default.
-*/
-
-.editor-page footer,
-.page-content.editor-page footer,
-.editor-page .footer,
-.page-content.editor-page .footer,
-.editor-page .app-footer,
-.page-content.editor-page .app-footer,
-.editor-page .status-footer,
-.page-content.editor-page .status-footer,
-.editor-page .statusbar,
-.page-content.editor-page .statusbar,
-.editor-page .status-bar,
-.page-content.editor-page .status-bar,
-.editor-page .editor-footer,
-.page-content.editor-page .editor-footer,
-.editor-page .editor-status-bar,
-.page-content.editor-page .editor-status-bar {
-  flex: 0 0 auto;
-  min-height: 26px;
-  max-height: 40px;
-  padding: 4px 8px;
-  font-size: 12px;
-  line-height: 1.2;
-  overflow: hidden;
-}
-
-/* Keep footer/status text from becoming multi-line and consuming editor height. */
-.editor-page footer *,
-.page-content.editor-page footer *,
-.editor-page .footer *,
-.page-content.editor-page .footer *,
-.editor-page .status-footer *,
-.page-content.editor-page .status-footer *,
-.editor-page .statusbar *,
-.page-content.editor-page .statusbar *,
-.editor-page .status-bar *,
-.page-content.editor-page .status-bar *,
-.editor-page .editor-footer *,
-.page-content.editor-page .editor-footer *,
-.editor-page .editor-status-bar *,
-.page-content.editor-page .editor-status-bar * {
+.editor-page-content .editor-footer-strip > span,
+.editor-page-content .editor-footer-strip > code {
+  min-width: 0;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  line-height: 1.2;
 }
 
-/* Editor page bottom/output panels should not dominate by default. They remain resizable if needed. */
-.editor-page .bottom-panel,
-.page-content.editor-page .bottom-panel,
-.editor-page .output-panel,
-.page-content.editor-page .output-panel,
-.editor-page .activity-log,
-.page-content.editor-page .activity-log,
-.editor-page .terminal-output,
-.page-content.editor-page .terminal-output,
-.editor-page .diagnostics-output,
-.page-content.editor-page .diagnostics-output,
-.editor-page .ai-output,
-.page-content.editor-page .ai-output,
-.editor-page .ai-response,
-.page-content.editor-page .ai-response,
-.editor-page .log-output,
-.page-content.editor-page .log-output {
-  flex: 0 1 auto;
-  min-height: 72px;
-  max-height: 140px;
-  padding: 8px 10px;
-  font-size: 12px;
-  line-height: 1.35;
-  overflow: auto;
+.editor-page-content .editor-footer-strip .status-path {
+  flex: 1 1 auto;
 }
 
-/* Reduce extra note/helper text spacing on the Editor page. */
-.editor-page .muted-note,
-.page-content.editor-page .muted-note,
-.editor-page .helper-text,
-.page-content.editor-page .helper-text,
-.editor-page .hint-text,
-.page-content.editor-page .hint-text {
-  margin-top: 3px;
-  margin-bottom: 4px;
-  font-size: 12px;
-  line-height: 1.3;
+.editor-page-content .editor-footer-strip code {
+  flex: 0 1 360px;
+  max-width: 42%;
 }
 
-/* Keep action rows compact so they do not push the editor down. */
-.editor-page .editor-actions,
-.page-content.editor-page .editor-actions,
-.editor-page .file-actions,
-.page-content.editor-page .file-actions,
-.editor-page .toolbar,
-.page-content.editor-page .toolbar,
-.editor-page .button-row,
-.page-content.editor-page .button-row {
-  gap: 6px;
-  padding-top: 4px;
-  padding-bottom: 4px;
-  min-height: 30px;
+/* Preserve compact mode, but still favor the editor. */
+.compact-mode .editor-page-content {
+  grid-template-rows: 28px minmax(0, 1fr) 24px;
 }
 
-/* Buttons in editor footer/status/action areas should be compact. */
-.editor-page .editor-actions button,
-.page-content.editor-page .editor-actions button,
-.editor-page .file-actions button,
-.page-content.editor-page .file-actions button,
-.editor-page footer button,
-.page-content.editor-page footer button,
-.editor-page .footer button,
-.page-content.editor-page .footer button,
-.editor-page .statusbar button,
-.page-content.editor-page .statusbar button,
-.editor-page .status-bar button,
-.page-content.editor-page .status-bar button {
-  min-height: 26px;
-  padding: 4px 8px;
-  font-size: 12px;
+.compact-mode .editor-page-content.no-open-tabs {
+  grid-template-rows: minmax(0, 1fr) 24px;
 }
 
-/* If the app has a global footer below the page, keep it compact while editing. */
-.app-shell:has(.editor-page) > footer,
-.app-shell:has(.page-content.editor-page) > footer,
-.app-layout:has(.editor-page) > footer,
-.app-layout:has(.page-content.editor-page) > footer {
+.compact-mode .editor-page-content .tabs {
+  height: 28px;
+  max-height: 28px;
+}
+
+.compact-mode .editor-page-content .editor-footer-strip {
+  height: 24px;
   min-height: 24px;
-  max-height: 34px;
   padding: 3px 8px;
-  font-size: 12px;
-  overflow: hidden;
-}
-
-/* Compact mode trims a little more. */
-.compact-mode .editor-page footer,
-.compact-mode .page-content.editor-page footer,
-.compact-mode .editor-page .footer,
-.compact-mode .page-content.editor-page .footer,
-.compact-mode .editor-page .statusbar,
-.compact-mode .page-content.editor-page .statusbar,
-.compact-mode .editor-page .status-bar,
-.compact-mode .page-content.editor-page .status-bar,
-.compact-mode .editor-page .editor-footer,
-.compact-mode .page-content.editor-page .editor-footer {
-  min-height: 22px;
-  max-height: 32px;
-  padding: 3px 6px;
   font-size: 11px;
 }
 
-.compact-mode .editor-page .bottom-panel,
-.compact-mode .page-content.editor-page .bottom-panel,
-.compact-mode .editor-page .output-panel,
-.compact-mode .page-content.editor-page .output-panel,
-.compact-mode .editor-page .terminal-output,
-.compact-mode .page-content.editor-page .terminal-output,
-.compact-mode .editor-page .activity-log,
-.compact-mode .page-content.editor-page .activity-log {
-  min-height: 56px;
-  max-height: 110px;
+/* Short screens still open with the editor taking almost everything. */
+@media (max-height: 760px) {
+  .editor-page-content {
+    grid-template-rows: 28px minmax(0, 1fr) 24px;
+  }
+
+  .editor-page-content.no-open-tabs {
+    grid-template-rows: minmax(0, 1fr) 24px;
+  }
+
+  .editor-page-content .tabs {
+    height: 28px;
+    max-height: 28px;
+  }
+
+  .editor-page-content .editor-footer-strip {
+    height: 24px;
+    min-height: 24px;
+    padding: 3px 8px;
+  }
 }
-/* DCS v0.7.0 compact editor footer end */
+/* DCS v0.7.0 targeted editor max layout end */
