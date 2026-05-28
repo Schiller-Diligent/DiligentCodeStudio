@@ -162,6 +162,8 @@ type AppPreferences = {
   compactMode: boolean;
   interfaceMode: InterfaceModePreference;
   menuPageOrder: WorkspacePage[];
+  firstRunSetupCompleted: boolean;
+  firstRunSetupCompletedAt: string;
 };
 
 const PREFERENCES_STORAGE_KEY = 'diligent-code-studio.preferences.v1';
@@ -299,6 +301,8 @@ const DEFAULT_PREFERENCES: AppPreferences = {
   compactMode: false,
   interfaceMode: 'beginner',
   menuPageOrder: DEFAULT_PAGE_ORDER,
+  firstRunSetupCompleted: false,
+  firstRunSetupCompletedAt: '',
 };
 
 function clampNumber(value: unknown, fallback: number, min: number, max: number): number {
@@ -340,6 +344,8 @@ function loadPreferences(): AppPreferences {
       aiDefaultContext,
       interfaceMode,
       menuPageOrder,
+      firstRunSetupCompleted: parsed.firstRunSetupCompleted === true,
+      firstRunSetupCompletedAt: typeof parsed.firstRunSetupCompletedAt === 'string' ? parsed.firstRunSetupCompletedAt : '',
       editorFontSize: clampNumber(parsed.editorFontSize, DEFAULT_PREFERENCES.editorFontSize, 10, 28),
       autoSaveDelaySeconds: clampNumber(parsed.autoSaveDelaySeconds, DEFAULT_PREFERENCES.autoSaveDelaySeconds, 1, 30),
       lastActivePage: normalizeWorkspacePage(parsed.lastActivePage),
@@ -790,6 +796,8 @@ export default function App() {
   const [helpManualOpen, setHelpManualOpen] = useState(false);
   const [onboardingOpen, setOnboardingOpen] = useState(() => {
     try {
+      const loadedPreferences = loadPreferences();
+      if (loadedPreferences.firstRunSetupCompleted) return false;
       return window.localStorage.getItem(ONBOARDING_STORAGE_KEY) !== 'completed';
     } catch {
       return true;
@@ -1508,13 +1516,47 @@ export default function App() {
   }
 
   function completeOnboarding(page?: WorkspacePage) {
+    const completedAt = new Date().toISOString();
+    const selectedWorkspace = preferences.defaultWorkspacePath.trim() || DEFAULT_PREFERENCES.defaultWorkspacePath;
+
     try {
       window.localStorage.setItem(ONBOARDING_STORAGE_KEY, 'completed');
     } catch {
       // Ignore local storage failures and continue with the selected action.
     }
+
+    setPreferences((current) => ({
+      ...current,
+      defaultWorkspacePath: selectedWorkspace,
+      lastWorkspacePath: selectedWorkspace,
+      firstRunSetupCompleted: true,
+      firstRunSetupCompletedAt: completedAt,
+    }));
+    setWorkspacePath(selectedWorkspace);
+    setTerminalCwd(selectedWorkspace);
     setOnboardingOpen(false);
+    log('success', `First Run Setup completed. Default workspace: ${selectedWorkspace}`);
+
     if (page) activateWorkspacePage(page);
+  }
+
+  function resetFirstRunSetup() {
+    const confirmed = window.confirm('Reset First Run Setup so the wizard opens again? This will not erase your files or API keys.');
+    if (!confirmed) return;
+
+    try {
+      window.localStorage.removeItem(ONBOARDING_STORAGE_KEY);
+    } catch {
+      // Ignore local storage failures and reopen the wizard anyway.
+    }
+
+    setPreferences((current) => ({
+      ...current,
+      firstRunSetupCompleted: false,
+      firstRunSetupCompletedAt: '',
+    }));
+    setOnboardingOpen(true);
+    log('warn', 'First Run Setup was reset and reopened.');
   }
 
 
@@ -3364,7 +3406,7 @@ ERROR: ${String(error)}
           <div className="app-top-logo"><ShieldCheck size={18} /></div>
           <div>
             <strong>Diligent Code Studio</strong>
-            <span>Local-first AI development workbench â€¢ v0.7.0-dev</span>
+            <span>Local-first AI development workbench Ã¢â‚¬Â¢ v0.7.0-dev</span>
           </div>
         </div>
         <div className="app-health-strip" aria-label="Project health summary">
@@ -3524,7 +3566,7 @@ ERROR: ${String(error)}
                 <h2>What do you want to do?</h2>
                 <p className="muted-note">Choose a guided path. Diligent Code Studio will move you to the right workspace and show the next step.</p>
               </div>
-              <button className="secondary-button" onClick={() => setOnboardingOpen(true)}><BrainCircuit size={14} /> Reopen Welcome Wizard</button>
+              <button className="secondary-button" onClick={() => setOnboardingOpen(true)}><BrainCircuit size={14} /> Open First Run Setup</button>
             </div>
 
             <div className="start-choice-grid">
@@ -3610,7 +3652,7 @@ ERROR: ${String(error)}
                   <FileCode2 size={14} />
                   <span className="dirty-dot" title={file.dirty ? 'Unsaved changes' : 'Saved'} />
                   {file.name}{file.dirty ? ' *' : ''}
-                  <span className="tab-close" onClick={(event) => { event.stopPropagation(); closeFile(file.path); }}>Ã—</span>
+                  <span className="tab-close" onClick={(event) => { event.stopPropagation(); closeFile(file.path); }}>Ãƒâ€”</span>
                 </button>
               ))}
             </nav>
@@ -3890,7 +3932,7 @@ ERROR: ${String(error)}
               <div className="terminal-header">
                 <div>
                   <div className="panel-title"><TerminalSquare size={16} /> Terminal</div>
-                  <p title={terminalCwd}>Working directory: {terminalCwd} Â· Shell: {shellLabel(preferences.terminalShell)}</p>
+                  <p title={terminalCwd}>Working directory: {terminalCwd} Ã‚Â· Shell: {shellLabel(preferences.terminalShell)}</p>
                 </div>
                 <div className="terminal-actions">
                   <button onClick={setTerminalToWorkspace}>Use Workspace</button>
@@ -3969,7 +4011,7 @@ ERROR: ${String(error)}
                 {gitStatus ? (
                   <div className="git-status-cards">
                     <div className="git-status-card"><span>Repository Root</span><strong title={gitStatus.git_root}>{gitStatus.git_root}</strong></div>
-                    <div className="git-status-card"><span>Branch</span><strong>{gitStatus.branch}{gitStatus.ahead_behind ? ` Â· ${gitStatus.ahead_behind}` : ''}</strong></div>
+                    <div className="git-status-card"><span>Branch</span><strong>{gitStatus.branch}{gitStatus.ahead_behind ? ` Ã‚Â· ${gitStatus.ahead_behind}` : ''}</strong></div>
                     <div className="git-status-card"><span>Working Tree</span><strong className={gitStatus.clean ? 'ok-text' : 'warn-text'}>{gitStatus.clean ? 'Clean' : `${gitStatus.changed_files.length} changed file(s)`}</strong></div>
                   </div>
                 ) : !gitError ? (
@@ -4034,7 +4076,7 @@ ERROR: ${String(error)}
                         <code>{commit.hash}</code>
                         <div>
                           <strong>{commit.message}</strong>
-                          <span>{commit.date} Â· {commit.author}</span>
+                          <span>{commit.date} Ã‚Â· {commit.author}</span>
                         </div>
                       </div>
                     ))
@@ -4387,7 +4429,7 @@ ERROR: ${String(error)}
                         <div className="registry-card-header">
                           <div>
                             <strong>{item.name}</strong>
-                            <span>{item.category} â€¢ {item.builtIn ? 'Built-in' : 'Custom'}</span>
+                            <span>{item.category} Ã¢â‚¬Â¢ {item.builtIn ? 'Built-in' : 'Custom'}</span>
                           </div>
                           <button className="secondary-button" onClick={() => toggleRegistryTool(item.id)} title="Enable or disable this registry tool">
                             {item.enabled ? <CheckCircle2 size={14} /> : <AlertTriangle size={14} />}
@@ -4536,7 +4578,7 @@ ERROR: ${String(error)}
                               <div className="setup-card-header">
                                 <div>
                                   <strong>{item.name}</strong>
-                                  <span>{item.required ? 'Required' : 'Optional'} â€¢ {item.command || 'No command check'}</span>
+                                  <span>{item.required ? 'Required' : 'Optional'} Ã¢â‚¬Â¢ {item.command || 'No command check'}</span>
                                 </div>
                                 <span className={`setup-status-pill ${item.available ? 'ok' : 'missing'}`}>
                                   {item.available ? <CheckCircle2 size={13} /> : <AlertTriangle size={13} />}
@@ -4961,7 +5003,7 @@ ERROR: ${String(error)}
                 <h2>Set up Diligent Code Studio</h2>
                 <p>Choose your starting preferences, verify required tools, configure optional AI support, and then open the workspace that matches what you want to do next.</p>
               </div>
-              <button className="icon-only-button" onClick={() => completeOnboarding()}>Ã—</button>
+              <button className="icon-only-button" onClick={() => completeOnboarding()}>Ãƒâ€”</button>
             </header>
 
             <div className="onboarding-progress-grid">
@@ -5063,7 +5105,7 @@ ERROR: ${String(error)}
             </div>
             <div className="assistant-pocket-window-actions">
               <button className="icon-only-button" onClick={resetAiHelpPosition} title="Reset AI Help position"><RefreshCw size={13} /></button>
-              <button className="icon-only-button" onClick={() => setAiDockOpen(false)} title="Close AI Help">Ã—</button>
+              <button className="icon-only-button" onClick={() => setAiDockOpen(false)} title="Close AI Help">Ãƒâ€”</button>
             </div>
           </div>
 
