@@ -1,8 +1,8 @@
-# Diligent Code Studio v0.6.10
+# Diligent Code Studio v0.7.0-dev
 
 Diligent Code Studio is a local-first desktop code editor and AI-assisted development workbench built with React, Vite, TypeScript, Tauri, and Rust.
 
-Version **0.6.10** is the current working release. It keeps the cleaned one-line workspace navigation from v0.6.9 and fixes the npm audit issue by pinning Monaco Editor to a safe dependency path.
+Version **0.7.0-dev** starts the First Run Setup Wizard improvement track. The clean **v0.6.10** release remains the stable baseline; develop this branch until npm, Rust, Tauri, and installer checks pass.
 
 ## What is included
 
@@ -66,6 +66,7 @@ npm run release:check
 - Current in-app manual: `public/manuals/DiligentCodeStudio_UserManual.pdf`
 - Source manual copy: `docs/DiligentCodeStudio_UserManual.pdf`
 - Operator/user manual: `docs/manuals/Diligent_Code_Studio_v0.6.10_Operator_User_Manual.pdf`
+- v0.7.0-dev wizard plan: `FIRST_RUN_SETUP_WIZARD_v0.7.0.md`
 - Security notes: `SECURITY.md`
 - Testing guide: `docs/TESTING_AND_SECURITY.md`
 - Open-source acknowledgments: `docs/OPEN_SOURCE_CREDITS.md`
@@ -77,4 +78,4 @@ npm run release:check
 
 ## Release notes
 
-The current v0.6.10 notes remain at the repository root. Older release and validation notes were moved under `docs/archive/` to keep the root folder easier to work with.
+The current v0.7.0-dev notes remain at the repository root. v0.6.10 remains the clean stable baseline, and older release/validation notes are kept under `docs/archive/` when possible.

@@ -27,6 +27,18 @@ function Invoke-NpmConfig {
     }
 }
 
+
+function Assert-PackageLockUsesPublicRegistry {
+    if (Test-Path "package-lock.json") {
+        $badRegistryMatches = Select-String -Path "package-lock.json" -Pattern "packages\.applied-caas-gateway|internal\.api\.openai|artifactory/api/npm" -SimpleMatch:$false -ErrorAction SilentlyContinue
+        if ($badRegistryMatches) {
+            Write-Error "package-lock.json contains internal/private npm registry URLs. Regenerate or patch package-lock.json so all resolved tarball URLs use https://registry.npmjs.org/."
+            $badRegistryMatches | Select-Object -First 10 | ForEach-Object { Write-Error $_.Line }
+            throw "Refusing to run npm ci with internal/private registry URLs in package-lock.json."
+        }
+    }
+}
+
 function Remove-NodeModulesSafely {
     if (Test-Path "node_modules") {
         Write-Host "Removing existing node_modules folder..."
@@ -56,6 +68,8 @@ Invoke-NpmConfig @('config', 'set', 'update-notifier', 'false')
 
 Write-Host "npm registry:"
 Invoke-NpmConfig @('config', 'get', 'registry')
+
+Assert-PackageLockUsesPublicRegistry
 
 for ($attempt = 1; $attempt -le $MaxAttempts; $attempt++) {
     Write-Host "npm ci attempt $attempt of $MaxAttempts..."

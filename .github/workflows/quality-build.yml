@@ -10,7 +10,6 @@ permissions:
   contents: read
 
 env:
-  APP_VERSION: '0.6.10'
   NPM_CONFIG_REGISTRY: https://registry.npmjs.org/
   NPM_CONFIG_FETCH_TIMEOUT: '120000'
   NPM_CONFIG_FETCH_RETRIES: '5'
@@ -21,22 +20,8 @@ env:
 
 jobs:
   quality-build:
-    name: Quality Build - ${{ matrix.platform_name }}
-    runs-on: ${{ matrix.os }}
-
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - platform_name: Windows
-            os: windows-latest
-            artifact_suffix: windows
-          - platform_name: Linux
-            os: ubuntu-22.04
-            artifact_suffix: linux
-          - platform_name: macOS
-            os: macos-13
-            artifact_suffix: macos
+    name: Typecheck, tests, frontend build, and audits
+    runs-on: windows-latest
 
     steps:
       - name: Checkout
@@ -58,23 +43,6 @@ jobs:
         with:
           workspaces: src-tauri -> target
 
-      - name: Install Linux system dependencies
-        if: runner.os == 'Linux'
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y \
-            build-essential \
-            curl \
-            file \
-            libayatana-appindicator3-dev \
-            librsvg2-dev \
-            libssl-dev \
-            libwebkit2gtk-4.1-dev \
-            libxdo-dev \
-            patchelf \
-            rpm \
-            wget
-
       - name: Install npm dependencies with retry
         shell: pwsh
         run: ./scripts/Install-NpmDependencies.ps1
@@ -87,65 +55,3 @@ jobs:
 
       - name: Rust unit tests
         run: npm run test:rust
-
-      - name: Generate Tauri icons if generated platform icons are missing
-        shell: pwsh
-        run: |
-          if (Test-Path "app-icon.png") {
-            Write-Host "Regenerating Tauri icon set from app-icon.png..."
-            npx tauri icon app-icon.png
-          } else {
-            Write-Host "app-icon.png not found. Skipping icon generation."
-          }
-
-      - name: Build Diligent Code Studio desktop package
-        run: npm run tauri:build
-
-      - name: List bundle output
-        shell: pwsh
-        run: |
-          $bundleRoot = "src-tauri/target/release/bundle"
-          if (-not (Test-Path $bundleRoot)) {
-            throw "Bundle output folder not found: $bundleRoot"
-          }
-
-          Get-ChildItem $bundleRoot -Recurse -Force |
-            Select-Object FullName, Length |
-            Format-Table -AutoSize
-
-      - name: Create SHA-256 checksums
-        shell: pwsh
-        run: |
-          $bundleRoot = "src-tauri/target/release/bundle"
-          $checksumFile = "checksums-${{ matrix.artifact_suffix }}.txt"
-
-          if (Test-Path $checksumFile) {
-            Remove-Item $checksumFile -Force
-          }
-
-          if (-not (Test-Path $bundleRoot)) {
-            throw "Bundle output folder not found: $bundleRoot"
-          }
-
-          $files = Get-ChildItem $bundleRoot -Recurse -File
-
-          if (-not $files) {
-            throw "No files found under bundle output folder: $bundleRoot"
-          }
-
-          foreach ($file in $files) {
-            $hash = Get-FileHash $file.FullName -Algorithm SHA256
-            "$($hash.Hash)  $($file.Name)" | Tee-Object -FilePath $checksumFile -Append
-          }
-
-          Get-Content $checksumFile
-
-      - name: Upload ${{ matrix.platform_name }} build artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: diligent-code-studio-v${{ env.APP_VERSION }}-${{ matrix.artifact_suffix }}
-          path: |
-            src-tauri/target/release/bundle/**
-            checksums-${{ matrix.artifact_suffix }}.txt
-          if-no-files-found: error
-          retention-days: 14

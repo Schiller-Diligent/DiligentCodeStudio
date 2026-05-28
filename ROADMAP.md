@@ -1,5 +1,15 @@
 # Diligent Code Studio Roadmap
 
+
+
+## v0.7.0-dev — First Run Setup Wizard Track
+
+- Convert the welcome overlay into a true first-run setup wizard.
+- Make Beginner/Advanced mode selection part of first launch.
+- Make dependency setup, AI provider choice, and workspace path selection obvious.
+- Keep v0.6.10 as the stable baseline while v0.7.0 is developed on a branch.
+- Do not reintroduce the removed Guide Me top button or duplicate on-page guide card.
+
 ## Completed
 
 - v0.1.1 Folder picker and explorer

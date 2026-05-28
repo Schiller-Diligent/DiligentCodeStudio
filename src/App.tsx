@@ -728,11 +728,11 @@ export default function App() {
   const [toolStatuses, setToolStatuses] = useState<ToolStatus[]>([]);
   const [platformInfo, setPlatformInfo] = useState<PlatformInfo | null>(null);
   const [activity, setActivity] = useState<ActivityItem[]>([
-    { at: nowStamp(), level: 'info', message: 'Diligent Code Studio v0.6.10 loaded. Setup & Dependencies remains in the top-right controls and is no longer duplicated in the Workspace Menu.' },
+    { at: nowStamp(), level: 'info', message: 'Diligent Code Studio v0.7.0-dev loaded. First Run Setup Wizard foundation is active.' },
   ]);
   const [terminalCommand, setTerminalCommand] = useState('git status');
   const [terminalOutput, setTerminalOutput] = useState(
-    'Diligent Terminal ready. Version 0.6.0 keeps Terminal on the dedicated Terminal page and adds project-aware AI Help access.\n',
+    'Diligent Terminal ready. Version 0.7.0-dev starts the First Run Setup Wizard improvement track.\n',
   );
   const [terminalRunning, setTerminalRunning] = useState(false);
   const [terminalCollapsed, setTerminalCollapsed] = useState(false);
@@ -3364,7 +3364,7 @@ ERROR: ${String(error)}
           <div className="app-top-logo"><ShieldCheck size={18} /></div>
           <div>
             <strong>Diligent Code Studio</strong>
-            <span>Local-first AI development workbench • v0.6.10</span>
+            <span>Local-first AI development workbench • v0.7.0-dev</span>
           </div>
         </div>
         <div className="app-health-strip" aria-label="Project health summary">
@@ -3571,7 +3571,7 @@ ERROR: ${String(error)}
                 <ol className="getting-started-list">
                   <li><strong>Check Setup & Dependencies</strong><span>Make sure the needed tools are installed.</span></li>
                   <li><strong>Open or create a project</strong><span>Use Choose Folder or Project Templates.</span></li>
-                  <li><strong>Use AI Help when unsure</strong><span>The upper-right AI Help button explains the current screen.</span></li>
+                  <li><strong>Use AI Help when unsure</strong><span>The AI Coding Assistant page can answer project and workflow questions.</span></li>
                   <li><strong>Build and test</strong><span>Use Terminal, Problems, and Project Dashboard.</span></li>
                   <li><strong>Create a release</strong><span>Use Release Builder when the project is ready.</span></li>
                 </ol>
@@ -3643,7 +3643,7 @@ ERROR: ${String(error)}
                     <div className="welcome-card editor-welcome-card">
                       <ShieldCheck size={48} />
                       <h2>Open a file to start editing.</h2>
-                      <p>Version 0.6.10 removes the duplicate Setup & Dependencies button from the Workspace Menu so the main focus items have more room on one line.</p>
+                      <p>Version 0.7.0-dev starts the First Run Setup Wizard track while keeping the streamlined Workspace Menu from v0.6.10.</p>
                       <div className="recent-files-card">
                         <div className="recent-files-header">
                           <strong>Recent Files</strong>
@@ -3742,7 +3742,7 @@ ERROR: ${String(error)}
                     <button onClick={() => prepareProjectAiAction('summarize-project')} disabled={aiBusy}>Summarize Project</button>
                     <button onClick={() => prepareProjectAiAction('create-installer-script')} disabled={aiBusy}>Installer Script</button>
                   </div>
-                  <p className="muted-note">Sensitive files should be excluded with <code>.aiignore</code>. v0.6.10 can prepare project-wide prompts, web deployment plans, onboarding guidance, hosting help, movable AI Help guidance, consistent guide panels, open-source acknowledgment guidance, and cleaner one-line workspace navigation while still asking before sending context when enabled.</p>
+                  <p className="muted-note">Sensitive files should be excluded with <code>.aiignore</code>. v0.7.0-dev keeps project-wide prompts, web deployment plans, onboarding guidance, hosting help, movable AI Help, open-source acknowledgment guidance, and streamlined workspace navigation while still asking before sending context when enabled.</p>
                 </section>
 
                 <section className="ai-response-card">
@@ -4953,29 +4953,67 @@ ERROR: ${String(error)}
 
 
       {onboardingOpen && (
-        <section className="onboarding-overlay" role="dialog" aria-modal="true" aria-label="Welcome to Diligent Code Studio">
-          <div className="onboarding-dialog">
+        <section className="onboarding-overlay" role="dialog" aria-modal="true" aria-label="First Run Setup Wizard">
+          <div className="onboarding-dialog first-run-wizard-dialog">
             <header className="onboarding-header">
               <div>
-                <div className="panel-title"><Rocket size={18} /> Welcome to Diligent Code Studio</div>
-                <h2>What do you want to do first?</h2>
-                <p>Pick a path and the app will take you to the right workspace. You can reopen this wizard from Start Here.</p>
+                <div className="panel-title"><Rocket size={18} /> First Run Setup Wizard</div>
+                <h2>Set up Diligent Code Studio</h2>
+                <p>Choose your starting preferences, verify required tools, configure optional AI support, and then open the workspace that matches what you want to do next.</p>
               </div>
               <button className="icon-only-button" onClick={() => completeOnboarding()}>×</button>
             </header>
+
+            <div className="onboarding-progress-grid">
+              <section className="onboarding-step-card">
+                <span>Step 1</span>
+                <strong>Choose interface mode</strong>
+                <p>Beginner keeps more explanations visible. Advanced keeps the same tools with less hand-holding.</p>
+                <div className="segmented-mode-row">
+                  <button className={preferences.interfaceMode === 'beginner' ? 'active' : ''} onClick={() => updatePreference('interfaceMode', 'beginner')}>Beginner</button>
+                  <button className={preferences.interfaceMode === 'advanced' ? 'active' : ''} onClick={() => updatePreference('interfaceMode', 'advanced')}>Advanced</button>
+                </div>
+              </section>
+              <section className="onboarding-step-card">
+                <span>Step 2</span>
+                <strong>Check dependencies</strong>
+                <p>Verify Node.js, Git, Rust, Tauri, GitHub CLI, Ollama, and other optional tools.</p>
+                <button className="secondary-button" onClick={() => completeOnboarding('setup')}><PackageCheck size={14} /> Open Setup</button>
+              </section>
+              <section className="onboarding-step-card">
+                <span>Step 3</span>
+                <strong>Pick AI mode</strong>
+                <p>Ollama is recommended for local-first work. You can keep AI disabled until you are ready.</p>
+                <div className="segmented-mode-row wrap-row">
+                  <button className={preferences.aiProvider === 'ollama' ? 'active' : ''} onClick={() => updatePreference('aiProvider', 'ollama')}>Ollama</button>
+                  <button className={preferences.aiProvider === 'openai' ? 'active' : ''} onClick={() => updatePreference('aiProvider', 'openai')}>OpenAI</button>
+                  <button className={preferences.aiProvider === 'disabled' ? 'active' : ''} onClick={() => updatePreference('aiProvider', 'disabled')}>Disabled</button>
+                </div>
+              </section>
+              <section className="onboarding-step-card">
+                <span>Step 4</span>
+                <strong>Choose a workspace path</strong>
+                <p>This becomes the default folder used when opening projects and creating templates.</p>
+                <input
+                  className="onboarding-path-input"
+                  value={preferences.defaultWorkspacePath}
+                  onChange={(event) => updatePreference('defaultWorkspacePath', event.target.value)}
+                  placeholder="C:\DiligentProjects"
+                />
+              </section>
+            </div>
+
             <div className="onboarding-choice-grid">
               <button onClick={() => completeOnboarding('templates')}><LayoutTemplate size={20} /><strong>Build a desktop app</strong><span>Start from a project template.</span></button>
               <button onClick={() => completeOnboarding('web')}><Globe2 size={20} /><strong>Build a website</strong><span>Preview locally or prepare public hosting.</span></button>
               <button onClick={() => completeOnboarding('editor')}><FolderOpen size={20} /><strong>Open an existing project</strong><span>Choose a folder and edit files.</span></button>
               <button onClick={() => completeOnboarding('ai')}><Bot size={20} /><strong>Use AI with code</strong><span>Ask project-aware coding questions.</span></button>
-              <button onClick={() => completeOnboarding('setup')}><PackageCheck size={20} /><strong>Set up my computer</strong><span>Install and verify required tools.</span></button>
               <button onClick={() => completeOnboarding('release')}><Rocket size={20} /><strong>Create an installer</strong><span>Validate, build, and package releases.</span></button>
               <button onClick={() => completeOnboarding('credits')}><ExternalLink size={20} /><strong>View open-source credits</strong><span>Recognize the contributors behind the tools used here.</span></button>
             </div>
             <footer className="onboarding-footer">
-              <button className="secondary-button" onClick={() => updatePreference('interfaceMode', 'beginner')}>Use Beginner Mode</button>
-              <button className="secondary-button" onClick={() => updatePreference('interfaceMode', 'advanced')}>Use Advanced Mode</button>
-              <button className="secondary-button" onClick={() => completeOnboarding('start')}>Go to Start Here</button>
+              <button className="secondary-button" onClick={() => setHelpManualOpen(true)}>Open Manual</button>
+              <button className="secondary-button" onClick={() => completeOnboarding('start')}>Finish and Open Start Here</button>
             </footer>
           </div>
         </section>

@@ -1,5 +1,15 @@
 # Changelog
 
+
+
+## v0.7.0-dev — First Run Setup Wizard Foundation
+
+- Started the First Run Setup Wizard track.
+- Converted the first-run overlay from a basic welcome chooser into a setup-oriented wizard.
+- Added interface mode, dependency setup, AI provider, and default workspace path decisions to first launch.
+- Preserved the streamlined v0.6.10 UI cleanup: no top Guide Me button and no duplicate on-page guide card.
+- Added v0.7.0-dev planning and release-note documents.
+
 ## v0.6.10 - Final UI, Manual, and CI Update
 
 - Removed the top toolbar **Guide Me** button.
