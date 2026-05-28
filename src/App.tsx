@@ -1548,6 +1548,50 @@ export default function App() {
   log('warn', 'First Run Setup was reset and reopened.');
   }
 
+  function openFirstRunActionPage(page: WorkspacePage) {
+    setOnboardingOpen(false);
+    activateWorkspacePage(page);
+  }
+
+  async function runFirstRunDependencyCheck() {
+    setOnboardingOpen(false);
+    activateWorkspacePage('setup');
+    await refreshSetupDependencies();
+  }
+
+  async function chooseFirstRunWorkspaceFolder() {
+    try {
+      const selected = await invoke<string | null>('pick_workspace_folder');
+      if (!selected) {
+        log('warn', 'First Run Setup workspace selection was cancelled.');
+        return;
+      }
+
+      setPreferences((current) => ({
+        ...current,
+        defaultWorkspacePath: selected,
+        lastWorkspacePath: selected,
+      }));
+
+      setWorkspacePath(selected);
+      setTerminalCwd(selected);
+      await openWorkspace(selected);
+      log('success', `First Run Setup workspace selected: ${selected}`);
+    } catch (error) {
+      log('error', `First Run Setup workspace selection failed: ${String(error)}`);
+    }
+  }
+
+  function openFirstRunAiSettings() {
+    setOnboardingOpen(false);
+    setActivePage('settings');
+    log('info', 'Opened Settings from First Run Setup to configure AI.');
+  }
+
+  function openFirstRunManual() {
+    setHelpManualOpen(true);
+  }
+
   function rememberRecentFile(path: string, language: string) {
   const item: RecentFileItem = {
   path,
@@ -4989,7 +5033,10 @@ ERROR: ${String(error)}
   <span>Step 2</span>
   <strong>Check dependencies</strong>
   <p>Verify Node.js, Git, Rust, Tauri, GitHub CLI, Ollama, and other optional tools.</p>
-  <button className="secondary-button" onClick={() => completeOnboarding('setup')}><PackageCheck size={14} /> Open Setup</button>
+  <div className="segmented-mode-row wrap-row">
+                <button className="secondary-button" onClick={runFirstRunDependencyCheck} disabled={setupLoading}><RefreshCw size={14} /> {setupLoading ? 'Checking...' : 'Check Now'}</button>
+                <button className="secondary-button" onClick={() => openFirstRunActionPage('setup')}><PackageCheck size={14} /> Open Setup Page</button>
+              </div>
   </section>
   <section className="onboarding-step-card">
   <span>Step 3</span>
@@ -5011,6 +5058,10 @@ ERROR: ${String(error)}
   onChange={(event) => updatePreference('defaultWorkspacePath', event.target.value)}
   placeholder="C:\DiligentProjects"
   />
+              <div className="segmented-mode-row wrap-row">
+                <button className="secondary-button" onClick={chooseFirstRunWorkspaceFolder}><FolderOpen size={14} /> Choose Workspace Folder</button>
+                <button className="secondary-button" onClick={() => { void openWorkspace(preferences.defaultWorkspacePath); }}><RefreshCw size={14} /> Open Default Path</button>
+              </div>
   </section>
   </div>
 
@@ -5023,8 +5074,8 @@ ERROR: ${String(error)}
   <button onClick={() => completeOnboarding('credits')}><ExternalLink size={20} /><strong>View open-source credits</strong><span>Recognize the contributors behind the tools used here.</span></button>
   </div>
   <footer className="onboarding-footer">
-  <button className="secondary-button" onClick={() => setHelpManualOpen(true)}>Open Manual</button>
-  <button className="secondary-button" onClick={() => completeOnboarding('start')}>Finish and Open Start Here</button>
+  <button className="secondary-button" onClick={openFirstRunManual}>Open Manual</button>
+  <button className="primary-button" onClick={() => completeOnboarding('start')}>Finish and Open Start Here</button>
   </footer>
   </div>
   </section>
