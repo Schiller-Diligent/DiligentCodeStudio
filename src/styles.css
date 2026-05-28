@@ -3981,7 +3981,7 @@ body {
 }
 
 
-/* v0.4.9 Workspace Menu fixed top area ÃƒÂ¢Ã¢â€šÂ¬" no horizontal scrolling */
+/* v0.4.9 Workspace Menu fixed top area ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬" no horizontal scrolling */
 .workspace-menu-shell {
   min-height: auto;
   display: flex;
@@ -5876,3 +5876,129 @@ body {
   }
 }
 /* DCS v0.7.0 resizable editor panes end */
+
+/* DCS v0.7.0 editor max-area default start */
+/*
+  Editor page default layout:
+  The code editor should open large by default. Users can still resize panes manually.
+*/
+
+:root {
+  --dcs-editor-default-height: clamp(620px, calc(100vh - 210px), 1200px);
+  --dcs-editor-compact-default-height: clamp(540px, calc(100vh - 190px), 1100px);
+}
+
+/* Keep surrounding editor chrome compact so the code area gets priority. */
+.page-content.editor-page,
+.editor-page {
+  min-height: calc(100vh - 150px);
+}
+
+.editor-page .page-title-block,
+.page-content.editor-page .page-title-block,
+.editor-page .panel-title,
+.page-content.editor-page .panel-title {
+  margin-bottom: 6px;
+}
+
+.editor-page .muted-note,
+.page-content.editor-page .muted-note {
+  margin-top: 4px;
+  margin-bottom: 6px;
+}
+
+/* Make the actual editor/code surface large by default. */
+.editor-page .monaco-editor-shell,
+.editor-page .monaco-editor-container,
+.editor-page .monaco-container,
+.editor-page .monaco-editor,
+.editor-page .code-editor,
+.editor-page .editor-textarea,
+.editor-page .code-textarea,
+.editor-page textarea,
+.page-content.editor-page .monaco-editor-shell,
+.page-content.editor-page .monaco-editor-container,
+.page-content.editor-page .monaco-container,
+.page-content.editor-page .monaco-editor,
+.page-content.editor-page .code-editor,
+.page-content.editor-page .editor-textarea,
+.page-content.editor-page .code-textarea,
+.page-content.editor-page textarea,
+.panel:has(.monaco-editor) .monaco-editor,
+.panel:has(.monaco-editor) .overflow-guard,
+.panel:has(.editor-textarea) .editor-textarea,
+.panel:has(.code-textarea) .code-textarea {
+  min-height: var(--dcs-editor-default-height);
+  height: var(--dcs-editor-default-height);
+}
+
+/* If the editor has a toolbar/actions row, keep it compact. */
+.editor-page .editor-actions,
+.editor-page .file-actions,
+.editor-page .tab-strip,
+.editor-page .editor-tabs,
+.editor-page .toolbar,
+.page-content.editor-page .editor-actions,
+.page-content.editor-page .file-actions,
+.page-content.editor-page .tab-strip,
+.page-content.editor-page .editor-tabs,
+.page-content.editor-page .toolbar {
+  flex: 0 0 auto;
+}
+
+/* Keep the editor itself growing instead of sibling notes/logs stealing the page. */
+.editor-page .editor-panel,
+.editor-page .code-editor-panel,
+.editor-page .editor-container,
+.editor-page .editor-shell,
+.page-content.editor-page .editor-panel,
+.page-content.editor-page .code-editor-panel,
+.page-content.editor-page .editor-container,
+.page-content.editor-page .editor-shell,
+.panel:has(.monaco-editor),
+.panel:has(.editor-textarea),
+.panel:has(.code-textarea) {
+  flex: 1 1 auto;
+}
+
+/* Left workspace panel should remain useful but not dominate the editor. */
+.workspace-panel {
+  flex: 0 0 clamp(260px, 22vw, 380px);
+}
+
+/* Compact mode still defaults to a large editor, just slightly smaller. */
+.compact-mode .editor-page .monaco-editor-shell,
+.compact-mode .editor-page .monaco-editor-container,
+.compact-mode .editor-page .monaco-container,
+.compact-mode .editor-page .monaco-editor,
+.compact-mode .editor-page .code-editor,
+.compact-mode .editor-page .editor-textarea,
+.compact-mode .editor-page .code-textarea,
+.compact-mode .editor-page textarea,
+.compact-mode .page-content.editor-page .monaco-editor-shell,
+.compact-mode .page-content.editor-page .monaco-editor-container,
+.compact-mode .page-content.editor-page .monaco-container,
+.compact-mode .page-content.editor-page .monaco-editor,
+.compact-mode .page-content.editor-page .code-editor,
+.compact-mode .page-content.editor-page .editor-textarea,
+.compact-mode .page-content.editor-page .code-textarea,
+.compact-mode .page-content.editor-page textarea {
+  min-height: var(--dcs-editor-compact-default-height);
+  height: var(--dcs-editor-compact-default-height);
+}
+
+/* On short screens, still show a practical amount of code. */
+@media (max-height: 760px) {
+  :root {
+    --dcs-editor-default-height: 460px;
+    --dcs-editor-compact-default-height: 420px;
+  }
+}
+
+@media (max-height: 620px) {
+  :root {
+    --dcs-editor-default-height: 360px;
+    --dcs-editor-compact-default-height: 340px;
+  }
+}
+/* DCS v0.7.0 editor max-area default end */
