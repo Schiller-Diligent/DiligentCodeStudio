@@ -3424,7 +3424,7 @@ ERROR: ${String(error)}
   return (
   <main className={`app-shell v050-shell theme-${preferences.theme} ${preferences.compactMode ? 'compact-mode' : ''} mode-${preferences.interfaceMode} ${aiDockOpen ? 'assistant-open' : 'assistant-closed'}`}>
   <header className="app-top-appbar">
-  <div className="app-top-title">
+  <div data-active-page={activePage} className="app-top-title">
   <div className="app-top-logo"><ShieldCheck size={18} /></div>
   <div>
   <strong>Diligent Code Studio</strong>

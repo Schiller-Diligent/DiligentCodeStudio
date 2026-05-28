@@ -3981,7 +3981,7 @@ body {
 }
 
 
-/* v0.4.9 Workspace Menu fixed top area ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬" no horizontal scrolling */
+/* v0.4.9 Workspace Menu fixed top area ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬" no horizontal scrolling */
 .workspace-menu-shell {
   min-height: auto;
   display: flex;
@@ -6167,3 +6167,163 @@ body {
   max-height: 110px;
 }
 /* DCS v0.7.0 compact editor footer end */
+
+/* DCS v0.7.0 true editor focus layout start */
+/*
+  True Editor Focus Layout:
+  Earlier CSS tried to resize editor-page descendants only. The large "footer" area appears to be a global bottom/status panel,
+  so this targets the whole app whenever activePage is editor.
+*/
+
+[data-active-page="editor"] {
+  height: 100vh;
+  max-height: 100vh;
+  overflow: hidden;
+}
+
+/* Keep the primary shell from allowing a bottom panel to consume half the window. */
+[data-active-page="editor"] .app-body,
+[data-active-page="editor"] .app-content,
+[data-active-page="editor"] .workspace-shell,
+[data-active-page="editor"] .main-shell,
+[data-active-page="editor"] .main-area,
+[data-active-page="editor"] .page-mode,
+[data-active-page="editor"] .page-content,
+[data-active-page="editor"] .page-content.editor-page,
+[data-active-page="editor"] .editor-page {
+  min-height: 0 !important;
+  height: auto !important;
+  max-height: none !important;
+}
+
+/* Collapse global bottom/footer panels on the Editor page. They can remain full-size on Terminal, Problems, Logs, etc. */
+[data-active-page="editor"] .bottom-panel,
+[data-active-page="editor"] .bottom-panel-shell,
+[data-active-page="editor"] .bottom-tabs,
+[data-active-page="editor"] .bottom-dock,
+[data-active-page="editor"] .footer-panel,
+[data-active-page="editor"] .status-footer,
+[data-active-page="editor"] .activity-footer,
+[data-active-page="editor"] .activity-log-panel,
+[data-active-page="editor"] .activity-panel,
+[data-active-page="editor"] .terminal-footer,
+[data-active-page="editor"] .diagnostics-footer,
+[data-active-page="editor"] .output-footer,
+[data-active-page="editor"] .app-footer,
+[data-active-page="editor"] footer {
+  display: none !important;
+  height: 0 !important;
+  min-height: 0 !important;
+  max-height: 0 !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  border: 0 !important;
+  overflow: hidden !important;
+}
+
+/* Make the editor page occupy the usable viewport below the app header/workspace menu. */
+[data-active-page="editor"] .page-content.editor-page,
+[data-active-page="editor"] .editor-page,
+[data-active-page="editor"] .editor-shell,
+[data-active-page="editor"] .editor-layout,
+[data-active-page="editor"] .editor-container,
+[data-active-page="editor"] .editor-main,
+[data-active-page="editor"] .code-editor-panel,
+[data-active-page="editor"] .editor-panel {
+  display: flex !important;
+  flex-direction: column !important;
+  flex: 1 1 auto !important;
+  min-height: calc(100vh - 155px) !important;
+  height: calc(100vh - 155px) !important;
+  max-height: calc(100vh - 155px) !important;
+  overflow: hidden !important;
+}
+
+/* The code surface should fill almost all remaining space. */
+[data-active-page="editor"] .monaco-editor-shell,
+[data-active-page="editor"] .monaco-editor-container,
+[data-active-page="editor"] .monaco-container,
+[data-active-page="editor"] .monaco-editor,
+[data-active-page="editor"] .monaco-editor .overflow-guard,
+[data-active-page="editor"] .code-editor,
+[data-active-page="editor"] .editor-textarea,
+[data-active-page="editor"] .code-textarea,
+[data-active-page="editor"] textarea {
+  flex: 1 1 auto !important;
+  min-height: calc(100vh - 220px) !important;
+  height: calc(100vh - 220px) !important;
+  max-height: calc(100vh - 220px) !important;
+  overflow: auto !important;
+}
+
+/* Keep top controls compact on the Editor page. */
+[data-active-page="editor"] .workspace-command-row,
+[data-active-page="editor"] .page-title-block,
+[data-active-page="editor"] .editor-actions,
+[data-active-page="editor"] .file-actions,
+[data-active-page="editor"] .toolbar,
+[data-active-page="editor"] .tab-strip,
+[data-active-page="editor"] .editor-tabs {
+  flex: 0 0 auto !important;
+  min-height: 0 !important;
+  padding-top: 3px !important;
+  padding-bottom: 3px !important;
+  margin-top: 0 !important;
+  margin-bottom: 4px !important;
+}
+
+/* Compact notes/helpers so they do not push the editor down. */
+[data-active-page="editor"] .muted-note,
+[data-active-page="editor"] .helper-text,
+[data-active-page="editor"] .hint-text {
+  margin-top: 2px !important;
+  margin-bottom: 3px !important;
+  line-height: 1.25 !important;
+  font-size: 12px !important;
+}
+
+/* Let the left workspace panel stay visible but not oversized. */
+[data-active-page="editor"] .workspace-panel {
+  flex: 0 0 clamp(240px, 20vw, 340px) !important;
+  max-width: 340px !important;
+  min-width: 220px !important;
+  overflow: auto !important;
+}
+
+/* If the current file editor is not open and the welcome card is showing, keep the welcome compact too. */
+[data-active-page="editor"] .editor-welcome-card,
+[data-active-page="editor"] .welcome-card {
+  max-height: calc(100vh - 220px) !important;
+  overflow: auto !important;
+}
+
+/* Short screens still favor the code editor. */
+@media (max-height: 760px) {
+  [data-active-page="editor"] .page-content.editor-page,
+  [data-active-page="editor"] .editor-page,
+  [data-active-page="editor"] .editor-shell,
+  [data-active-page="editor"] .editor-layout,
+  [data-active-page="editor"] .editor-container,
+  [data-active-page="editor"] .editor-main,
+  [data-active-page="editor"] .code-editor-panel,
+  [data-active-page="editor"] .editor-panel {
+    min-height: calc(100vh - 130px) !important;
+    height: calc(100vh - 130px) !important;
+    max-height: calc(100vh - 130px) !important;
+  }
+
+  [data-active-page="editor"] .monaco-editor-shell,
+  [data-active-page="editor"] .monaco-editor-container,
+  [data-active-page="editor"] .monaco-container,
+  [data-active-page="editor"] .monaco-editor,
+  [data-active-page="editor"] .monaco-editor .overflow-guard,
+  [data-active-page="editor"] .code-editor,
+  [data-active-page="editor"] .editor-textarea,
+  [data-active-page="editor"] .code-textarea,
+  [data-active-page="editor"] textarea {
+    min-height: calc(100vh - 185px) !important;
+    height: calc(100vh - 185px) !important;
+    max-height: calc(100vh - 185px) !important;
+  }
+}
+/* DCS v0.7.0 true editor focus layout end */
