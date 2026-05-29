@@ -31,7 +31,7 @@ export const LANGUAGE_DESCRIPTORS: LanguageDescriptor[] = [
 
 const extensionMap: Record<string, string> = LANGUAGE_DESCRIPTORS.reduce((map, descriptor) => {
   descriptor.extensions.forEach((extension) => {
-    map[extension.toLowerCase()] = descriptor.id;
+  map[extension.toLowerCase()] = descriptor.id;
   });
   return map;
 }, {} as Record<string, string>);
@@ -73,8 +73,8 @@ export function fileNameFromPath(path: string): string {
 export function supportedLanguageGroups(): Array<{ group: string; languages: LanguageDescriptor[] }> {
   const groups = new Map<string, LanguageDescriptor[]>();
   LANGUAGE_DESCRIPTORS.forEach((descriptor) => {
-    if (!groups.has(descriptor.group)) groups.set(descriptor.group, []);
-    groups.get(descriptor.group)!.push(descriptor);
+  if (!groups.has(descriptor.group)) groups.set(descriptor.group, []);
+  groups.get(descriptor.group)!.push(descriptor);
   });
   return Array.from(groups.entries()).map(([group, languages]) => ({ group, languages }));
 }
@@ -83,15 +83,15 @@ let languagesRegistered = false;
 
 function hasLanguage(monaco: any, id: string): boolean {
   try {
-    return monaco.languages.getLanguages().some((language: any) => language.id === id);
+  return monaco.languages.getLanguages().some((language: any) => language.id === id);
   } catch {
-    return false;
+  return false;
   }
 }
 
 function ensureLanguage(monaco: any, id: string, extensions: string[], aliases: string[]) {
   if (!hasLanguage(monaco, id)) {
-    monaco.languages.register({ id, extensions: extensions.map((extension) => `.${extension}`), aliases });
+  monaco.languages.register({ id, extensions: extensions.map((extension) => `.${extension}`), aliases });
   }
 }
 
@@ -101,120 +101,120 @@ export function registerDiligentLanguages(monaco: any) {
 
   ensureLanguage(monaco, 'powershell', ['ps1', 'psm1', 'psd1'], ['PowerShell', 'powershell', 'ps1']);
   monaco.languages.setMonarchTokensProvider('powershell', {
-    tokenizer: {
-      root: [
-        [/#[^\n]*/, 'comment'],
-        [/\$[a-zA-Z_][\w:]*/, 'variable'],
-        [/'[^']*'/, 'string'],
-        [/"([^"`]|`.)*"/, 'string'],
-        [/\b(function|param|process|begin|end|if|elseif|else|foreach|for|while|switch|try|catch|finally|return|throw|class|enum|using|namespace)\b/i, 'keyword'],
-        [/\b(Get|Set|New|Remove|Start|Stop|Restart|Test|Invoke|Write|Read|Copy|Move|Compress|Expand|Import|Export)-[A-Za-z]+\b/, 'type.identifier'],
-        [/[{}()[\]]/, '@brackets'],
-        [/\d+/, 'number'],
-      ],
-    },
+  tokenizer: {
+  root: [
+  [/#[^\n]*/, 'comment'],
+  [/\$[a-zA-Z_][\w:]*/, 'variable'],
+  [/'[^']*'/, 'string'],
+  [/"([^"`]|`.)*"/, 'string'],
+  [/\b(function|param|process|begin|end|if|elseif|else|foreach|for|while|switch|try|catch|finally|return|throw|class|enum|using|namespace)\b/i, 'keyword'],
+  [/\b(Get|Set|New|Remove|Start|Stop|Restart|Test|Invoke|Write|Read|Copy|Move|Compress|Expand|Import|Export)-[A-Za-z]+\b/, 'type.identifier'],
+  [/[{}()[\]]/, '@brackets'],
+  [/\d+/, 'number'],
+  ],
+  },
   });
 
   ensureLanguage(monaco, 'csharp', ['cs'], ['C#', 'csharp']);
   monaco.languages.setMonarchTokensProvider('csharp', {
-    tokenizer: {
-      root: [
-        [/\/\/.*$/, 'comment'],
-        [/\/\*/, 'comment', '@comment'],
-        [/"([^"\\]|\\.)*$/, 'string.invalid'],
-        [/"/, 'string', '@string'],
-        [/\b(namespace|using|class|struct|record|interface|enum|public|private|protected|internal|static|readonly|async|await|void|string|int|long|bool|double|decimal|var|new|return|if|else|foreach|for|while|switch|try|catch|finally|throw|null|true|false)\b/, 'keyword'],
-        [/[A-Z][\w]*/, 'type.identifier'],
-        [/[{}()[\]]/, '@brackets'],
-        [/\d+/, 'number'],
-      ],
-      comment: [[/[^/*]+/, 'comment'], [/\*\//, 'comment', '@pop'], [/[/*]/, 'comment']],
-      string: [[/[^\\"]+/, 'string'], [/\\./, 'string.escape'], [/"/, 'string', '@pop']],
-    },
+  tokenizer: {
+  root: [
+  [/\/\/.*$/, 'comment'],
+  [/\/\*/, 'comment', '@comment'],
+  [/"([^"\\]|\\.)*$/, 'string.invalid'],
+  [/"/, 'string', '@string'],
+  [/\b(namespace|using|class|struct|record|interface|enum|public|private|protected|internal|static|readonly|async|await|void|string|int|long|bool|double|decimal|var|new|return|if|else|foreach|for|while|switch|try|catch|finally|throw|null|true|false)\b/, 'keyword'],
+  [/[A-Z][\w]*/, 'type.identifier'],
+  [/[{}()[\]]/, '@brackets'],
+  [/\d+/, 'number'],
+  ],
+  comment: [[/[^/*]+/, 'comment'], [/\*\//, 'comment', '@pop'], [/[/*]/, 'comment']],
+  string: [[/[^\\"]+/, 'string'], [/\\./, 'string.escape'], [/"/, 'string', '@pop']],
+  },
   });
 
   ensureLanguage(monaco, 'rust', ['rs'], ['Rust', 'rust']);
   monaco.languages.setMonarchTokensProvider('rust', {
-    tokenizer: {
-      root: [
-        [/\/\/.*$/, 'comment'],
-        [/\/\*/, 'comment', '@comment'],
-        [/"([^"\\]|\\.)*"/, 'string'],
-        [/\b(fn|let|mut|pub|use|mod|struct|enum|impl|trait|async|await|match|if|else|loop|while|for|in|return|crate|super|self|Self|Result|Option|Some|None|Ok|Err|true|false)\b/, 'keyword'],
-        [/\b(String|PathBuf|Vec|HashMap|usize|u32|i32|bool|str)\b/, 'type.identifier'],
-        [/[{}()[\]]/, '@brackets'],
-        [/\d+/, 'number'],
-      ],
-      comment: [[/[^/*]+/, 'comment'], [/\*\//, 'comment', '@pop'], [/[/*]/, 'comment']],
-    },
+  tokenizer: {
+  root: [
+  [/\/\/.*$/, 'comment'],
+  [/\/\*/, 'comment', '@comment'],
+  [/"([^"\\]|\\.)*"/, 'string'],
+  [/\b(fn|let|mut|pub|use|mod|struct|enum|impl|trait|async|await|match|if|else|loop|while|for|in|return|crate|super|self|Self|Result|Option|Some|None|Ok|Err|true|false)\b/, 'keyword'],
+  [/\b(String|PathBuf|Vec|HashMap|usize|u32|i32|bool|str)\b/, 'type.identifier'],
+  [/[{}()[\]]/, '@brackets'],
+  [/\d+/, 'number'],
+  ],
+  comment: [[/[^/*]+/, 'comment'], [/\*\//, 'comment', '@pop'], [/[/*]/, 'comment']],
+  },
   });
 
   ensureLanguage(monaco, 'toml', ['toml'], ['TOML', 'toml']);
   monaco.languages.setMonarchTokensProvider('toml', {
-    tokenizer: {
-      root: [
-        [/#.*$/, 'comment'],
-        [/\[[^\]]+\]/, 'keyword'],
-        [/^[\w.-]+(?=\s*=)/, 'attribute.name'],
-        [/"([^"\\]|\\.)*"/, 'string'],
-        [/'[^']*'/, 'string'],
-        [/\b(true|false)\b/, 'keyword'],
-        [/\d+(\.\d+)?/, 'number'],
-      ],
-    },
+  tokenizer: {
+  root: [
+  [/#.*$/, 'comment'],
+  [/\[[^\]]+\]/, 'keyword'],
+  [/^[\w.-]+(?=\s*=)/, 'attribute.name'],
+  [/"([^"\\]|\\.)*"/, 'string'],
+  [/'[^']*'/, 'string'],
+  [/\b(true|false)\b/, 'keyword'],
+  [/\d+(\.\d+)?/, 'number'],
+  ],
+  },
   });
 
   ensureLanguage(monaco, 'yaml', ['yml', 'yaml'], ['YAML', 'yaml']);
   monaco.languages.setMonarchTokensProvider('yaml', {
-    tokenizer: {
-      root: [
-        [/#.*$/, 'comment'],
-        [/^[\t ]*[\w.-]+:/, 'attribute.name'],
-        [/-\s+/, 'delimiter'],
-        [/"([^"\\]|\\.)*"/, 'string'],
-        [/'[^']*'/, 'string'],
-        [/\b(true|false|null)\b/, 'keyword'],
-        [/\d+(\.\d+)?/, 'number'],
-      ],
-    },
+  tokenizer: {
+  root: [
+  [/#.*$/, 'comment'],
+  [/^[\t ]*[\w.-]+:/, 'attribute.name'],
+  [/-\s+/, 'delimiter'],
+  [/"([^"\\]|\\.)*"/, 'string'],
+  [/'[^']*'/, 'string'],
+  [/\b(true|false|null)\b/, 'keyword'],
+  [/\d+(\.\d+)?/, 'number'],
+  ],
+  },
   });
 
   ensureLanguage(monaco, 'inno', ['iss'], ['INNO Setup', 'inno', 'iss']);
   monaco.languages.setMonarchTokensProvider('inno', {
-    tokenizer: {
-      root: [
-        [/;.*/, 'comment'],
-        [/\[[^\]]+\]/, 'keyword'],
-        [/^[A-Za-z][\w]*=/, 'attribute.name'],
-        [/"[^"]*"/, 'string'],
-        [/\{[^}]+\}/, 'variable'],
-        [/\b(Name|Source|DestDir|Filename|Parameters|Flags|AppName|AppVersion|DefaultDirName|OutputDir|OutputBaseFilename)\b/, 'type.identifier'],
-      ],
-    },
+  tokenizer: {
+  root: [
+  [/;.*/, 'comment'],
+  [/\[[^\]]+\]/, 'keyword'],
+  [/^[A-Za-z][\w]*=/, 'attribute.name'],
+  [/"[^"]*"/, 'string'],
+  [/\{[^}]+\}/, 'variable'],
+  [/\b(Name|Source|DestDir|Filename|Parameters|Flags|AppName|AppVersion|DefaultDirName|OutputDir|OutputBaseFilename)\b/, 'type.identifier'],
+  ],
+  },
   });
 
   ensureLanguage(monaco, 'bat', ['bat', 'cmd'], ['Batch', 'bat', 'cmd']);
   monaco.languages.setMonarchTokensProvider('bat', {
-    tokenizer: {
-      root: [
-        [/::.*$/, 'comment'],
-        [/REM\b.*$/i, 'comment'],
-        [/%[^%]+%/, 'variable'],
-        [/"[^"]*"/, 'string'],
-        [/\b(ECHO|SET|IF|ELSE|FOR|IN|DO|CALL|GOTO|EXIT|PUSHD|POPD|START|WHERE|COPY|MOVE|DEL|MKDIR|RMDIR)\b/i, 'keyword'],
-      ],
-    },
+  tokenizer: {
+  root: [
+  [/::.*$/, 'comment'],
+  [/REM\b.*$/i, 'comment'],
+  [/%[^%]+%/, 'variable'],
+  [/"[^"]*"/, 'string'],
+  [/\b(ECHO|SET|IF|ELSE|FOR|IN|DO|CALL|GOTO|EXIT|PUSHD|POPD|START|WHERE|COPY|MOVE|DEL|MKDIR|RMDIR)\b/i, 'keyword'],
+  ],
+  },
   });
 
   ensureLanguage(monaco, 'ini', ['ini', 'inf'], ['INI', 'ini']);
   monaco.languages.setMonarchTokensProvider('ini', {
-    tokenizer: {
-      root: [
-        [/[#;].*$/, 'comment'],
-        [/\[[^\]]+\]/, 'keyword'],
-        [/^[A-Za-z0-9_.-]+(?=\s*=)/, 'attribute.name'],
-        [/"[^"]*"/, 'string'],
-      ],
-    },
+  tokenizer: {
+  root: [
+  [/[#;].*$/, 'comment'],
+  [/\[[^\]]+\]/, 'keyword'],
+  [/^[A-Za-z0-9_.-]+(?=\s*=)/, 'attribute.name'],
+  [/"[^"]*"/, 'string'],
+  ],
+  },
   });
 }
