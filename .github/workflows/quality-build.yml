@@ -1,11 +1,21 @@
 name: Quality Build
 
 on:
-  push:
-    branches: [main, master]
-  pull_request:
   workflow_dispatch:
-
+  push:
+    branches:
+      - main
+      - master
+      - 'feature/**'
+      - 'update/**'
+      - 'hotfix/**'
+      - 'release/**'
+    tags:
+      - 'v*.*.*'
+  pull_request:
+    branches:
+      - main
+      - master
 permissions:
   contents: read
 
