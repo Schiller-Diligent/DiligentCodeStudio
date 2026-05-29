@@ -35,3 +35,15 @@ logs/
 Thumbs.db
 .vscode/
 .idea/
+
+# Diligent Code Studio temporary backup/diagnostic files
+*.bak
+*.tmp
+*.orig
+*.rej
+.dcs-*/
+DCS_Editor_Layout_Diagnostics*.txt
+DCS-v*-Quality-Failure-Log*.txt
+DCS-Encoding*.txt
+DCS-Mojibake*.txt
+# End Diligent Code Studio temporary backup/diagnostic files
