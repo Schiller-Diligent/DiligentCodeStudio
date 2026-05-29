@@ -732,7 +732,7 @@ export default function App() {
   const [toolStatuses, setToolStatuses] = useState<ToolStatus[]>([]);
   const [platformInfo, setPlatformInfo] = useState<PlatformInfo | null>(null);
   const [activity, setActivity] = useState<ActivityItem[]>([
-  { at: nowStamp(), level: 'info', message: 'Diligent Code Studio v0.7.0-dev loaded. First Run Setup Wizard foundation is active.' },
+  { at: nowStamp(), level: 'info', message: 'Diligent Code Studio v0.7.0-dev loaded. Startup dependency check will run automatically.' },
   ]);
   const [terminalCommand, setTerminalCommand] = useState('git status');
   const [terminalOutput, setTerminalOutput] = useState(
@@ -808,7 +808,8 @@ export default function App() {
   const [setupDependencies, setSetupDependencies] = useState<SetupDependency[]>([]);
   const [setupLoading, setSetupLoading] = useState(false);
   const [setupInstallBusyId, setSetupInstallBusyId] = useState('');
-  const [setupOutput, setSetupOutput] = useState('Setup & Dependencies ready. Use Check Again to refresh installed tools. Installer buttons ask for confirmation first.\n');
+  const [setupOutput, setSetupOutput] = useState('Setup & Dependencies ready. Startup dependency check runs automatically; use Check Again to refresh manually. Installer buttons ask for confirmation first.\n');
+  const startupDependencyCheckRef = useRef(false);
 
   const activeFile = useMemo(
   () => openFiles.find((file) => file.path === activePath) ?? null,
@@ -1199,6 +1200,19 @@ export default function App() {
   return () => window.removeEventListener('beforeunload', handleBeforeUnload);
   }, [openFiles]);
 
+
+  useEffect(() => {
+    if (startupDependencyCheckRef.current) return;
+    startupDependencyCheckRef.current = true;
+
+    const timer = window.setTimeout(() => {
+      setSetupOutput((current) => `${current}[${nowStamp()}] Automatic startup dependency check started.\n`);
+      void refreshSetupDependencies();
+    }, 900);
+
+    return () => window.clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   function log(level: ActivityItem['level'], message: string) {
   setActivity((current) => [{ at: nowStamp(), level, message }, ...current].slice(0, 250));
   }
