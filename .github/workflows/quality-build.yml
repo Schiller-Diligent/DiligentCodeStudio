@@ -48,7 +48,7 @@ jobs:
             os: ubuntu-22.04
             artifact_suffix: linux
           - platform_name: macOS
-            os: macos-13
+            os: macos-15-intel
             artifact_suffix: macos
 
     steps:
