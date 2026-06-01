@@ -810,6 +810,7 @@ export default function App() {
   const [setupInstallBusyId, setSetupInstallBusyId] = useState('');
   const [setupOutput, setSetupOutput] = useState('Setup & Dependencies ready. Startup dependency check runs automatically; use Check Again to refresh manually. Installer buttons ask for confirmation first.\n');
   const startupDependencyCheckRef = useRef(false);
+  const savedWorkspaceAutoOpenRef = useRef(false);
 
   const activeFile = useMemo(
   () => openFiles.find((file) => file.path === activePath) ?? null,
@@ -1209,6 +1210,35 @@ export default function App() {
       setSetupOutput((current) => `${current}[${nowStamp()}] Automatic startup dependency check started.\n`);
       void refreshSetupDependencies();
     }, 900);
+
+    return () => window.clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
+    if (savedWorkspaceAutoOpenRef.current) return;
+    savedWorkspaceAutoOpenRef.current = true;
+
+    const savedWorkspace = (preferences.defaultWorkspacePath || preferences.lastWorkspacePath || '').trim();
+
+    if (!savedWorkspace) {
+      log('info', 'No saved workspace path configured for automatic startup open.');
+      return;
+    }
+
+    const timer = window.setTimeout(() => {
+      void (async () => {
+        try {
+          log('info', `Automatic saved workspace open started: ${savedWorkspace}`);
+          setWorkspacePath(savedWorkspace);
+          setTerminalCwd(savedWorkspace);
+          await openWorkspace(savedWorkspace);
+          log('success', `Automatically opened saved workspace: ${savedWorkspace}`);
+        } catch (error) {
+          log('error', `Automatic saved workspace open failed: ${String(error)}`);
+        }
+      })();
+    }, 1200);
 
     return () => window.clearTimeout(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
