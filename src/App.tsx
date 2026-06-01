@@ -1457,7 +1457,7 @@ export default function App() {
 
   function resetMenuPageOrder() {
   setPreferences((current) => ({ ...current, menuPageOrder: [...DEFAULT_PAGE_ORDER] }));
-  log('info', 'Workspace menu button order reset to defaults. Find/Search is available from the Editor quick panel.');
+  log('info', 'Workspace menu button order reset to defaults. Find/Search is available from the Editor quick panel. Find/Search is available from the Editor quick panel.');
   }
 
   function workspacePageIcon(page: WorkspacePage) {
