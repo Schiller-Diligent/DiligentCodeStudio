@@ -1,6 +1,4 @@
-import {
-  invoke
-} from '@tauri-apps/api/core';
+import { invoke } from '@tauri-apps/api/core';
 import {
   AlertTriangle,
   Bot,
@@ -33,7 +31,7 @@ import {
   TerminalSquare,
   Trash2,
   Wrench,
-  X
+  X,
 } from 'lucide-react';
 import Editor from '@monaco-editor/react';
 import { useEffect, useMemo, useRef, useState, type MouseEvent as ReactMouseEvent, type PointerEvent as ReactPointerEvent } from 'react';
@@ -3565,7 +3563,7 @@ ERROR: ${String(error)}
 
   <aside className="sidebar">
   <div className="brand-block">
-  <div className="brand-icon"><ShieldCheck size={24} /></div>
+  <div className="brand-icon"><img className="brand-icon-image" src="/branding/dss-app-brand-icon.png" alt="Diligent Software Services logo" /></div>
   <div>
   <h1>Diligent Code Studio</h1>
   <p className="brand-tagline">Secure software-building workbench</p>
