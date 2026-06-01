@@ -811,6 +811,7 @@ export default function App() {
   const [setupOutput, setSetupOutput] = useState('Setup & Dependencies ready. Startup dependency check runs automatically; use Check Again to refresh manually. Installer buttons ask for confirmation first.\n');
   const startupDependencyCheckRef = useRef(false);
   const savedWorkspaceAutoOpenRef = useRef(false);
+  const savedWorkspaceAutoOpenPathRef = useRef('');
 
   const activeFile = useMemo(
   () => openFiles.find((file) => file.path === activePath) ?? null,
@@ -1243,6 +1244,37 @@ export default function App() {
     return () => window.clearTimeout(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  useEffect(() => {
+    const savedWorkspace = (preferences.defaultWorkspacePath || preferences.lastWorkspacePath || '').trim();
+
+    if (!savedWorkspace) {
+      return;
+    }
+
+    if (savedWorkspaceAutoOpenPathRef.current === savedWorkspace) {
+      return;
+    }
+
+    savedWorkspaceAutoOpenPathRef.current = savedWorkspace;
+
+    const timer = window.setTimeout(() => {
+      void (async () => {
+        try {
+          log('info', `Saved workspace watcher opening path: ${savedWorkspace}`);
+          setWorkspacePath(savedWorkspace);
+          setTerminalCwd(savedWorkspace);
+          await openWorkspace(savedWorkspace);
+          log('success', `Saved workspace watcher opened: ${savedWorkspace}`);
+        } catch (error) {
+          log('error', `Saved workspace watcher failed: ${String(error)}`);
+        }
+      })();
+    }, 800);
+
+    return () => window.clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [preferences.defaultWorkspacePath, preferences.lastWorkspacePath]);
   function log(level: ActivityItem['level'], message: string) {
   setActivity((current) => [{ at: nowStamp(), level, message }, ...current].slice(0, 250));
   }
