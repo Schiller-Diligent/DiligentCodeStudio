@@ -754,6 +754,7 @@ export default function App() {
   const [activePage, setActivePage] = useState<WorkspacePage>(() => loadPreferences().rememberLastActivePage ? loadPreferences().lastActivePage : 'editor');
   const [bottomPanelTab, setBottomPanelTab] = useState<BottomPanelTab>('terminal');
   const [findSearchMode, setFindSearchMode] = useState<'current' | 'workspace'>('current');
+  const [editorFindSearchOpen, setEditorFindSearchOpen] = useState(false);
   const [gitStatus, setGitStatus] = useState<GitStatusInfo | null>(null);
   const [gitLoading, setGitLoading] = useState(false);
   const [gitError, setGitError] = useState('');
@@ -3693,7 +3694,10 @@ ERROR: ${String(error)}
   <button className="toolbar-action" onClick={hashActiveFile} disabled={!activeFile} title="Generate SHA-256 for active file">
   <Hash size={14} /> <span>SHA</span>
   </button>
-  </div>
+  
+  <button className={`toolbar-action ${editorFindSearchOpen ? 'active' : ''}`} onClick={() => setEditorFindSearchOpen((current) => !current)} title="Open Find/Search panel">
+  <Search size={14} /> <span>Find/Search</span>
+  </button></div>
   </div>
   </header>
 
@@ -3796,6 +3800,121 @@ ERROR: ${String(error)}
   ))}
   </nav>
 
+
+  {editorFindSearchOpen && (
+  <section className="editor-find-search-popover" role="dialog" aria-label="Editor Find/Search panel">
+  <header className="editor-find-search-popover-header">
+  <div className="panel-title"><Search size={15} /> Find/Search</div>
+  <div className="editor-find-search-popover-actions">
+  <button type="button" className={findSearchMode === 'current' ? 'active' : ''} onClick={() => setFindSearchMode('current')}>Current File</button>
+  <button type="button" className={findSearchMode === 'workspace' ? 'active' : ''} onClick={() => setFindSearchMode('workspace')}>Workspace</button>
+  <button type="button" className="icon-mini-button" onClick={() => setEditorFindSearchOpen(false)} title="Close Find/Search"><X size={13} /></button>
+  </div>
+  </header>
+
+  {findSearchMode === 'current' ? (
+  <div className="editor-find-search-popover-body">
+  <div className="editor-find-search-grid">
+  <input
+  type="text"
+  value={findQuery}
+  onChange={(event) => setFindQuery(event.target.value)}
+  onKeyDown={(event) => {
+  if (event.key === 'Enter') {
+  event.preventDefault();
+  if (activeFile && currentFileFindMatches.length > 0) {
+  selectFindMatch(activeFindIndex);
+  }
+  }
+  }}
+  placeholder="Find in current file..."
+  spellCheck={false}
+  />
+  <input
+  type="text"
+  value={replaceText}
+  onChange={(event) => setReplaceText(event.target.value)}
+  placeholder="Replace with..."
+  spellCheck={false}
+  />
+  </div>
+  <div className="editor-find-search-options">
+  <label><input type="checkbox" checked={findCaseSensitive} onChange={(event) => setFindCaseSensitive(event.target.checked)} /> Case-sensitive</label>
+  <label><input type="checkbox" checked={findWholeWord} onChange={(event) => setFindWholeWord(event.target.checked)} /> Whole word</label>
+  </div>
+  <div className="editor-find-search-row">
+  <span className="editor-find-search-summary">
+  {activeFile
+  ? `${currentFileFindMatches.length === 0 ? 0 : activeFindIndex + 1} of ${currentFileFindMatches.length} match${currentFileFindMatches.length === 1 ? '' : 'es'} in ${activeFile.name}`
+  : 'Open a file to use current-file Find / Replace'}
+  </span>
+  <div className="editor-find-search-buttons">
+  <button type="button" onClick={findPrevious} disabled={!activeFile || currentFileFindMatches.length === 0}>Previous</button>
+  <button type="button" onClick={() => selectFindMatch(activeFindIndex)} disabled={!activeFile || currentFileFindMatches.length === 0}>Select</button>
+  <button type="button" onClick={findNext} disabled={!activeFile || currentFileFindMatches.length === 0}>Next</button>
+  <button type="button" onClick={replaceCurrentMatch} disabled={!activeFile || currentFileFindMatches.length === 0}>Replace</button>
+  <button type="button" onClick={replaceAllMatches} disabled={!activeFile || currentFileFindMatches.length === 0}>Replace All</button>
+  </div>
+  </div>
+  </div>
+  ) : (
+  <div className="editor-find-search-popover-body">
+  <div className="editor-find-search-grid workspace-search-grid">
+  <input
+  type="text"
+  value={searchQuery}
+  onChange={(event) => setSearchQuery(event.target.value)}
+  onKeyDown={(event) => {
+  if (event.key === 'Enter') {
+  event.preventDefault();
+  void runSearch();
+  }
+  }}
+  placeholder="Search across workspace..."
+  spellCheck={false}
+  />
+  <input
+  type="text"
+  value={searchExtensionFilter}
+  onChange={(event) => setSearchExtensionFilter(event.target.value)}
+  placeholder="Extensions: .ps1,.ts,.cs"
+  spellCheck={false}
+  />
+  </div>
+  <div className="editor-find-search-options">
+  <label><input type="checkbox" checked={searchCaseSensitive} onChange={(event) => setSearchCaseSensitive(event.target.checked)} /> Case-sensitive</label>
+  <label><input type="checkbox" checked={searchWholeWord} onChange={(event) => setSearchWholeWord(event.target.checked)} /> Whole word</label>
+  </div>
+  <div className="editor-find-search-row">
+  <span className="editor-find-search-summary">{searchResults.length} workspace result{searchResults.length === 1 ? '' : 's'}</span>
+  <div className="editor-find-search-buttons">
+  <button type="button" onClick={runSearch} disabled={searchRunning || !searchQuery.trim()}>{searchRunning ? 'Searching...' : 'Search'}</button>
+  <button type="button" onClick={clearSearch} disabled={searchRunning && searchResults.length === 0}>Clear</button>
+  <button type="button" onClick={() => setActivePage('findsearch')}>Open Full Page</button>
+  </div>
+  </div>
+  <div className="editor-search-results-mini" aria-label="Workspace search results">
+  {searchResults.length === 0 ? (
+  <p className="muted-note">Run a workspace search to see clickable file results here.</p>
+  ) : (
+  searchResults.slice(0, 40).map((result, index) => (
+  <button key={`${result.path}-${result.line_number}-${result.column}-${index}`} className="editor-search-result-mini-row" onClick={() => openSearchResult(result)} title={result.path}>
+  <strong>{result.relative_path}</strong>
+  <span>Line {result.line_number}, Col {result.column}</span>
+  <code>{result.preview}</code>
+  </button>
+  ))
+  )}
+  {searchResults.length > 40 && (
+  <button type="button" className="editor-search-more-results" onClick={() => setActivePage('findsearch')}>
+  Open full Find/Search page to view all {searchResults.length} results
+  </button>
+  )}
+  </div>
+  </div>
+  )}
+  </section>
+  )}
   <section className="editor-wrap">
   <div className={`editor-ai-layout dock-closed ${activeFile ? 'has-active-file' : 'no-active-file'}`}>
   <div className="editor-canvas">
