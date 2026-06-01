@@ -3542,7 +3542,7 @@ ERROR: ${String(error)}
   <main className={`app-shell v050-shell theme-${preferences.theme} ${preferences.compactMode ? 'compact-mode' : ''} mode-${preferences.interfaceMode} ${aiDockOpen ? 'assistant-open' : 'assistant-closed'}`}>
   <header className="app-top-appbar">
   <div className="app-top-title">
-  <div className="app-top-logo"><ShieldCheck size={18} /></div>
+  <div className="app-top-logo"><img className="app-top-logo-image" src="/branding/dss-app-brand-icon.png" alt="Diligent Software Services logo" /></div>
   <div>
   <strong>Diligent Code Studio</strong>
   <span>Local-first AI development workbench - v0.7.0-dev</span>
