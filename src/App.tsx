@@ -774,6 +774,7 @@ export default function App() {
   const [diagnosticsBusy, setDiagnosticsBusy] = useState(false);
   const [diagnosticsOutput, setDiagnosticsOutput] = useState('Problems ready. Run diagnostics to capture TypeScript/Vite and Rust/Cargo output.\n');
   const [cursorPosition, setCursorPosition] = useState({ lineNumber: 1, column: 1 });
+  const [pendingEditorLocation, setPendingEditorLocation] = useState<{ path: string; lineNumber: number; column: number; length: number } | null>(null);
   const [recentFiles, setRecentFiles] = useState<RecentFileItem[]>(() => loadRecentFiles());
 
   const [toolRegistryItems, setToolRegistryItems] = useState<ToolRegistryItem[]>(() => loadToolRegistry());
@@ -1162,6 +1163,38 @@ export default function App() {
 
   setActiveFindIndex((current) => Math.min(current, currentFileFindMatches.length - 1));
   }, [currentFileFindMatches.length]);
+
+  useEffect(() => {
+    if (!pendingEditorLocation || !activeFile || activeFile.path !== pendingEditorLocation.path) {
+      return;
+    }
+
+    const timer = window.setTimeout(() => {
+      const editor = editorRef.current;
+      if (!editor) {
+        return;
+      }
+
+      const startLineNumber = Math.max(pendingEditorLocation.lineNumber, 1);
+      const startColumn = Math.max(pendingEditorLocation.column, 1);
+      const endColumn = Math.max(startColumn + pendingEditorLocation.length, startColumn + 1);
+
+      editor.setSelection({
+        startLineNumber,
+        startColumn,
+        endLineNumber: startLineNumber,
+        endColumn,
+      });
+      editor.revealLineInCenter(startLineNumber);
+      editor.focus();
+      setCursorPosition({ lineNumber: startLineNumber, column: startColumn });
+      setPendingEditorLocation(null);
+      log('info', `Workspace search result location revealed: ${basename(pendingEditorLocation.path)}:${startLineNumber}:${startColumn}`);
+    }, 150);
+
+    return () => window.clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pendingEditorLocation, activeFile?.path]);
 
   useEffect(() => {
   if (!terminalOutputRef.current) return;
@@ -2422,12 +2455,22 @@ export default function App() {
   }
 
   async function openSearchResult(result: SearchResult) {
-  await openFileByPath(result.path);
-  setActivePage('editor');
-  setSelectedEntry(entries.find((entry) => entry.path === result.path) ?? null);
-  log('info', `Search result opened: ${result.relative_path}:${result.line_number}:${result.column}`);
-  }
+    const lineNumber = Math.max(result.line_number || 1, 1);
+    const column = Math.max(result.column || 1, 1);
+    const length = Math.max(searchQuery.trim().length, 1);
 
+    setPendingEditorLocation({
+      path: result.path,
+      lineNumber,
+      column,
+      length,
+    });
+
+    await openFileByPath(result.path);
+    setActivePage('editor');
+    setSelectedEntry(entries.find((entry) => entry.path === result.path) ?? null);
+    log('info', `Search result opened: ${result.relative_path}:${lineNumber}:${column}`);
+  }
   function clearSearch() {
   setSearchResults([]);
   setSearchQuery('');
@@ -4001,7 +4044,7 @@ ERROR: ${String(error)}
   <button onClick={clearSearch} disabled={searchRunning && searchResults.length === 0}><Trash2 size={14} /> Clear</button>
   </div>
   </div>
-  <div className="search-summary">{searchResults.length} result{searchResults.length === 1 ? '' : 's'} shown. Search skips .git, node_modules, target, bin, obj, dist, and build folders.</div>
+  <div className="search-summary">{searchResults.length} result{searchResults.length === 1 ? '' : 's'} shown. Select a result to open the file and jump to that line. Search skips .git, node_modules, target, bin, obj, dist, and build folders.</div>
   <div className="search-results page-results">
   {searchResults.length === 0 ? (
   <p className="muted-note">Run a workspace search to see clickable file results here.</p>
