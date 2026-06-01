@@ -222,7 +222,6 @@ const DEFAULT_PAGE_ORDER: WorkspacePage[] = [
   'web',
   'editor',
   'ai',
-  'findsearch',
   'terminal',
   'git',
   'problems',
@@ -263,7 +262,7 @@ function normalizePageOrder(value: unknown): WorkspacePage[] {
   for (const item of requested) {
   // Setup & Dependencies remains available from the top-right Setup button,
   // but it is intentionally excluded from the main Workspace Menu to save room.
-  if (item === 'setup') continue;
+  if (item === 'setup' || item === 'findsearch') continue;
   if (isWorkspacePage(item) && !ordered.includes(item)) {
   ordered.push(item);
   }
@@ -1458,7 +1457,7 @@ export default function App() {
 
   function resetMenuPageOrder() {
   setPreferences((current) => ({ ...current, menuPageOrder: [...DEFAULT_PAGE_ORDER] }));
-  log('info', 'Workspace menu button order reset to defaults.');
+  log('info', 'Workspace menu button order reset to defaults. Find/Search is available from the Editor quick panel.');
   }
 
   function workspacePageIcon(page: WorkspacePage) {
@@ -3655,7 +3654,7 @@ ERROR: ${String(error)}
   <section className="main-area page-mode">
   <header className="topbar workspace-menu-shell">
   <nav className="top-page-nav draggable-top-page-nav" aria-label="Workspace pages. Drag buttons to reorder.">
-  {normalizePageOrder(preferences.menuPageOrder).map((page) => {
+  {normalizePageOrder(preferences.menuPageOrder).filter((page) => page !== 'findsearch').map((page) => {
   const dropClass = dragOverMenuPage === page ? `drag-over drag-over-${dragOverMenuDropSide}` : '';
   return (
   <button
