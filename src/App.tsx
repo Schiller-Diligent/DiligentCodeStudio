@@ -3995,6 +3995,12 @@ ERROR: ${String(error)}
   <section className="ai-controls-card">
   <label className="setting-row">
   <span>Context</span>
+                  <div className="ai-provider-hub-inline-action dcs-ai-page-provider-hub-button">
+                    <button className="secondary-button" type="button" onClick={() => window.dispatchEvent(new Event('dcs-open-ai-provider-hub'))}>
+                      AI Providers
+                    </button>
+                    <span>Connect to Ollama, LM Studio, OpenAI-compatible, or custom AI endpoints.</span>
+                  </div>
   <select value={aiContextMode} onChange={(event) => setAiContextMode(event.target.value as AiContextPreference)}>
   <option value="selection">Selected code / active file fallback</option>
   <option value="currentFile">Current file</option>
@@ -5166,6 +5172,12 @@ ERROR: ${String(error)}
   </div>
   <label className="setting-row">
   <span>Default AI context</span>
+                  <div className="ai-provider-hub-inline-action dcs-settings-ai-provider-hub-button">
+                    <button className="secondary-button" type="button" onClick={() => window.dispatchEvent(new Event('dcs-open-ai-provider-hub'))}>
+                      Configure AI Providers
+                    </button>
+                    <span>Manage local and online AI provider profiles. API keys are session-only unless secure storage is added later.</span>
+                  </div>
   <select value={preferences.aiDefaultContext} onChange={(event) => updatePreference('aiDefaultContext', event.target.value as AiContextPreference)}>
   <option value="selection">Selected code</option>
   <option value="currentFile">Current file</option>
