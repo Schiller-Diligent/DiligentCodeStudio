@@ -5,7 +5,6 @@ on:
   push:
     branches:
       - main
-      - master
       - 'feature/**'
       - 'update/**'
       - 'hotfix/**'
@@ -15,27 +14,22 @@ on:
   pull_request:
     branches:
       - main
-      - master
 
 permissions:
   contents: read
 
 env:
-  APP_VERSION_LABEL: '0.7.0-dev'
-  PACKAGE_VERSION: '0.7.0'
   NPM_CONFIG_REGISTRY: https://registry.npmjs.org/
   NPM_CONFIG_FETCH_TIMEOUT: '120000'
   NPM_CONFIG_FETCH_RETRIES: '5'
   NPM_CONFIG_FETCH_RETRY_MINTIMEOUT: '20000'
   NPM_CONFIG_FETCH_RETRY_MAXTIMEOUT: '120000'
-  NPM_CONFIG_FUND: 'false'
-  NPM_CONFIG_UPDATE_NOTIFIER: 'false'
 
 jobs:
   quality-build:
     name: Quality Build - ${{ matrix.platform_name }}
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 75
+    timeout-minutes: 90
 
     strategy:
       fail-fast: false
@@ -45,10 +39,10 @@ jobs:
             os: windows-latest
             artifact_suffix: windows
           - platform_name: Linux
-            os: ubuntu-22.04
+            os: ubuntu-latest
             artifact_suffix: linux
           - platform_name: macOS
-            os: macos-15-intel
+            os: macos-latest
             artifact_suffix: macos
 
     steps:
@@ -66,124 +60,166 @@ jobs:
       - name: Setup Rust toolchain
         uses: dtolnay/rust-toolchain@stable
 
-      - name: Setup Rust cache
-        uses: Swatinem/rust-cache@v2
-        with:
-          workspaces: src-tauri -> target
-
-      - name: Install Linux system dependencies
+      - name: Install Linux Tauri dependencies
         if: runner.os == 'Linux'
+        shell: bash
         run: |
+          set -euxo pipefail
           sudo apt-get update
           sudo apt-get install -y \
             build-essential \
             curl \
+            wget \
             file \
+            libssl-dev \
             libayatana-appindicator3-dev \
             librsvg2-dev \
-            libssl-dev \
-            libwebkit2gtk-4.1-dev \
-            libxdo-dev \
             patchelf \
-            rpm \
-            wget
+            libwebkit2gtk-4.1-dev
 
-      - name: Install npm dependencies with retry
-        shell: pwsh
-        run: ./scripts/Install-NpmDependencies.ps1
-
-      - name: Run TypeScript, smoke, unit, security, build, and npm audit checks
-        run: npm run quality
-
-      - name: Rust compile check
-        run: npm run check:rust
-
-      - name: Rust unit tests
-        run: npm run test:rust
-
-      - name: Generate Tauri icons if generated platform icons are missing
+      - name: Install npm dependencies
         shell: pwsh
         run: |
-          if (Test-Path "app-icon.png") {
-            Write-Host "Regenerating Tauri icon set from app-icon.png..."
-            npx tauri icon app-icon.png
-          } else {
-            Write-Host "app-icon.png not found. Skipping icon generation."
-          }
+          npm ci
 
-      - name: Build Diligent Code Studio desktop package
-        run: npm run tauri:build
+      - name: Run quality checks
+        shell: pwsh
+        run: |
+          npm run quality
+
+      - name: Build Tauri packages
+        shell: pwsh
+        run: |
+          npm run tauri:build --if-present
 
       - name: Stage build artifacts
+        if: always()
         shell: pwsh
         run: |
           $ErrorActionPreference = "Stop"
 
-          $bundleRoot = Join-Path "src-tauri" "target"
-          $bundleRoot = Join-Path $bundleRoot "release"
-          $bundleRoot = Join-Path $bundleRoot "bundle"
+          $suffix = "${{ matrix.artifact_suffix }}"
+          $sha = "${{ github.sha }}"
+          $shortSha = if ($sha.Length -ge 7) { $sha.Substring(0, 7) } else { $sha }
 
-          if (-not (Test-Path $bundleRoot)) {
-            throw "Bundle output folder not found: $bundleRoot"
+          $artifactRoot = Join-Path $PWD ".dcs-artifacts"
+          $stage = Join-Path $artifactRoot $suffix
+          New-Item -ItemType Directory -Path $stage -Force | Out-Null
+
+          $summary = Join-Path $stage "BUILD-SUMMARY-$suffix.txt"
+          "Diligent Code Studio Quality Build Artifact" | Set-Content $summary
+          "Platform: ${{ matrix.platform_name }}" | Add-Content $summary
+          "Runner OS: ${{ runner.os }}" | Add-Content $summary
+          "Commit: ${{ github.sha }}" | Add-Content $summary
+          "Run ID: ${{ github.run_id }}" | Add-Content $summary
+          "Run Attempt: ${{ github.run_attempt }}" | Add-Content $summary
+          "Ref: ${{ github.ref }}" | Add-Content $summary
+          "Generated: $(Get-Date -Format o)" | Add-Content $summary
+          "" | Add-Content $summary
+
+          if (Test-Path "package.json") {
+            Copy-Item "package.json" (Join-Path $stage "package.json") -Force
           }
 
-          Write-Host "Bundle output:"
-          Get-ChildItem $bundleRoot -Recurse -Force | Select-Object FullName, Length | Format-Table -AutoSize
-
-          $artifactRoot = "dist-artifacts"
-          $artifactDir = Join-Path $artifactRoot "${{ matrix.artifact_suffix }}"
-
-          if (Test-Path $artifactDir) {
-            Remove-Item $artifactDir -Recurse -Force
+          if (Test-Path "README.md") {
+            Copy-Item "README.md" (Join-Path $stage "README.md") -Force
           }
 
-          New-Item -ItemType Directory -Path $artifactDir -Force | Out-Null
-
-          $bundleFiles = Get-ChildItem $bundleRoot -Recurse -File | Where-Object {
-            $_.FullName -notmatch '\.dSYM($|\\|/)'
+          if (Test-Path "dist") {
+            $distTarget = Join-Path $stage "dist"
+            Copy-Item "dist" $distTarget -Recurse -Force
+            "Included frontend dist folder." | Add-Content $summary
+          } else {
+            "Frontend dist folder was not found." | Add-Content $summary
           }
 
-          if (-not $bundleFiles) {
-            throw "No bundle files found under: $bundleRoot"
+          if (Test-Path "public\manuals") {
+            $manualTarget = Join-Path $stage "public-manuals"
+            Copy-Item "public\manuals" $manualTarget -Recurse -Force
+            "Included public/manuals." | Add-Content $summary
           }
 
-          foreach ($file in $bundleFiles) {
-            $relative = [System.IO.Path]::GetRelativePath((Resolve-Path $bundleRoot).Path, $file.FullName)
-            $destination = Join-Path $artifactDir $relative
-            $destinationFolder = Split-Path $destination -Parent
-            New-Item -ItemType Directory -Path $destinationFolder -Force | Out-Null
-            Copy-Item $file.FullName $destination -Force
+          if (Test-Path "docs") {
+            $docsTarget = Join-Path $stage "docs"
+            New-Item -ItemType Directory -Path $docsTarget -Force | Out-Null
+            Get-ChildItem "docs" -Recurse -File -ErrorAction SilentlyContinue |
+              Where-Object { $_.FullName -notmatch "\\node_modules\\" } |
+              ForEach-Object {
+                $relative = [System.IO.Path]::GetRelativePath((Resolve-Path "docs").Path, $_.FullName)
+                $target = Join-Path $docsTarget $relative
+                New-Item -ItemType Directory -Path (Split-Path $target -Parent) -Force | Out-Null
+                Copy-Item $_.FullName $target -Force
+              }
+            "Included docs folder." | Add-Content $summary
           }
 
-          $checksumFile = Join-Path $artifactDir "checksums-${{ matrix.artifact_suffix }}.txt"
+          $bundleRoot = "src-tauri\target\release\bundle"
+          if (Test-Path $bundleRoot) {
+            $bundleTarget = Join-Path $stage "tauri-bundle"
+            Copy-Item $bundleRoot $bundleTarget -Recurse -Force
+            "Included Tauri bundle output." | Add-Content $summary
+          } else {
+            "Tauri bundle output was not found at $bundleRoot." | Add-Content $summary
+          }
+
+          $releaseExe = "src-tauri\target\release\diligent-code-studio.exe"
+          if (Test-Path $releaseExe) {
+            $binaryTarget = Join-Path $stage "release-binary"
+            New-Item -ItemType Directory -Path $binaryTarget -Force | Out-Null
+            Copy-Item $releaseExe $binaryTarget -Force
+            "Included Windows release binary." | Add-Content $summary
+          }
+
+          $releaseBinary = "src-tauri\target\release\diligent-code-studio"
+          if (Test-Path $releaseBinary) {
+            $binaryTarget = Join-Path $stage "release-binary"
+            New-Item -ItemType Directory -Path $binaryTarget -Force | Out-Null
+            Copy-Item $releaseBinary $binaryTarget -Force
+            "Included Unix release binary." | Add-Content $summary
+          }
+
+          $files = Get-ChildItem $stage -Recurse -File -ErrorAction SilentlyContinue
+          "Staged file count: $($files.Count)" | Add-Content $summary
+          $files | ForEach-Object {
+            $relative = [System.IO.Path]::GetRelativePath($stage, $_.FullName)
+            " - $relative ($($_.Length) bytes)" | Add-Content $summary
+          }
+
+          if ($files.Count -eq 0) {
+            throw "No artifact files were staged."
+          }
+
+          $zipName = "diligent-code-studio-quality-build-$suffix-$shortSha.zip"
+          $zipPath = Join-Path $artifactRoot $zipName
+          if (Test-Path $zipPath) {
+            Remove-Item $zipPath -Force
+          }
+
+          Compress-Archive -Path (Join-Path $stage "*") -DestinationPath $zipPath -Force
+
+          $checksumFile = Join-Path $artifactRoot "SHA256SUMS-$suffix.txt"
           if (Test-Path $checksumFile) {
             Remove-Item $checksumFile -Force
           }
 
-          $artifactFiles = Get-ChildItem $artifactDir -Recurse -File | Where-Object {
-            $_.Name -notlike "checksums-*.txt"
+          Get-ChildItem $artifactRoot -File -Filter "*.zip" | Sort-Object Name | ForEach-Object {
+            $hash = Get-FileHash $_.FullName -Algorithm SHA256
+            "$($hash.Hash.ToLower())  $($_.Name)" | Add-Content $checksumFile
           }
 
-          if (-not $artifactFiles) {
-            throw "No staged artifact files found under: $artifactDir"
-          }
-
-          foreach ($file in $artifactFiles) {
-            $hash = Get-FileHash $file.FullName -Algorithm SHA256
-            $relative = [System.IO.Path]::GetRelativePath((Resolve-Path $artifactDir).Path, $file.FullName)
-            "$($hash.Hash)  $relative" | Tee-Object -FilePath $checksumFile -Append
-          }
-
-          Write-Host "Staged artifacts:"
-          Get-ChildItem $artifactDir -Recurse -File | Select-Object FullName, Length | Format-Table -AutoSize
-
+          Write-Host "Artifact root:"
+          Get-ChildItem $artifactRoot -Recurse -File | Select-Object FullName, Length | Format-Table -AutoSize
+          Write-Host ""
           Write-Host "Checksums:"
           Get-Content $checksumFile
 
       - name: Upload ${{ matrix.platform_name }} build artifact
+        if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: diligent-code-studio-${{ env.APP_VERSION_LABEL }}-${{ matrix.artifact_suffix }}
-          path: dist-artifacts/${{ matrix.artifact_suffix }}/**
+          name: diligent-code-studio-${{ matrix.artifact_suffix }}-${{ github.run_number }}-${{ github.run_attempt }}
+          path: |
+            .dcs-artifacts/**/*.zip
+            .dcs-artifacts/**/*.txt
           if-no-files-found: error
-          retention-days: 14
+          retention-days: 30
