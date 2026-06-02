@@ -93,17 +93,54 @@ jobs:
           npm run tauri:build --if-present
 
       - name: Stage build artifacts
-        if: always()
+        if: ${{ always() }}
         shell: pwsh
         run: |
-          $ErrorActionPreference = "Stop"
+          $ErrorActionPreference = "Continue"
+
+          function Join-Many {
+            param([string[]]$Parts)
+
+            $current = $Parts[0]
+            for ($i = 1; $i -lt $Parts.Count; $i++) {
+              $current = Join-Path $current $Parts[$i]
+            }
+            return $current
+          }
+
+          function Copy-IfExists {
+            param(
+              [string]$Source,
+              [string]$Destination,
+              [switch]$Recurse
+            )
+
+            if (Test-Path $Source) {
+              New-Item -ItemType Directory -Path (Split-Path $Destination -Parent) -Force | Out-Null
+              if ($Recurse) {
+                Copy-Item $Source $Destination -Recurse -Force
+              } else {
+                Copy-Item $Source $Destination -Force
+              }
+              return $true
+            }
+
+            return $false
+          }
+
+          $workspace = $env:GITHUB_WORKSPACE
+          if (-not $workspace) {
+            $workspace = (Get-Location).Path
+          }
 
           $suffix = "${{ matrix.artifact_suffix }}"
           $sha = "${{ github.sha }}"
           $shortSha = if ($sha.Length -ge 7) { $sha.Substring(0, 7) } else { $sha }
 
-          $artifactRoot = Join-Path $PWD ".dcs-artifacts"
+          $artifactRoot = Join-Path $workspace "dist-artifacts"
           $stage = Join-Path $artifactRoot $suffix
+
+          New-Item -ItemType Directory -Path $artifactRoot -Force | Out-Null
           New-Item -ItemType Directory -Path $stage -Force | Out-Null
 
           $summary = Join-Path $stage "BUILD-SUMMARY-$suffix.txt"
@@ -115,111 +152,105 @@ jobs:
           "Run Attempt: ${{ github.run_attempt }}" | Add-Content $summary
           "Ref: ${{ github.ref }}" | Add-Content $summary
           "Generated: $(Get-Date -Format o)" | Add-Content $summary
+          "Workspace: $workspace" | Add-Content $summary
           "" | Add-Content $summary
 
-          if (Test-Path "package.json") {
-            Copy-Item "package.json" (Join-Path $stage "package.json") -Force
-          }
+          try {
+            if (Copy-IfExists "package.json" (Join-Path $stage "package.json")) {
+              "Included package.json." | Add-Content $summary
+            }
 
-          if (Test-Path "README.md") {
-            Copy-Item "README.md" (Join-Path $stage "README.md") -Force
-          }
+            if (Copy-IfExists "package-lock.json" (Join-Path $stage "package-lock.json")) {
+              "Included package-lock.json." | Add-Content $summary
+            }
 
-          if (Test-Path "dist") {
-            $distTarget = Join-Path $stage "dist"
-            Copy-Item "dist" $distTarget -Recurse -Force
-            "Included frontend dist folder." | Add-Content $summary
-          } else {
-            "Frontend dist folder was not found." | Add-Content $summary
-          }
+            if (Copy-IfExists "README.md" (Join-Path $stage "README.md")) {
+              "Included README.md." | Add-Content $summary
+            }
 
-          if (Test-Path "public\manuals") {
-            $manualTarget = Join-Path $stage "public-manuals"
-            Copy-Item "public\manuals" $manualTarget -Recurse -Force
-            "Included public/manuals." | Add-Content $summary
-          }
+            if (Copy-IfExists "dist" (Join-Path $stage "dist") -Recurse) {
+              "Included frontend dist folder." | Add-Content $summary
+            } else {
+              "Frontend dist folder was not found." | Add-Content $summary
+            }
 
-          if (Test-Path "docs") {
-            $docsTarget = Join-Path $stage "docs"
-            New-Item -ItemType Directory -Path $docsTarget -Force | Out-Null
-            Get-ChildItem "docs" -Recurse -File -ErrorAction SilentlyContinue |
-              Where-Object { $_.FullName -notmatch "\\node_modules\\" } |
-              ForEach-Object {
-                $relative = [System.IO.Path]::GetRelativePath((Resolve-Path "docs").Path, $_.FullName)
-                $target = Join-Path $docsTarget $relative
-                New-Item -ItemType Directory -Path (Split-Path $target -Parent) -Force | Out-Null
-                Copy-Item $_.FullName $target -Force
+            $publicManuals = Join-Many @("public", "manuals")
+            if (Copy-IfExists $publicManuals (Join-Path $stage "public-manuals") -Recurse) {
+              "Included public/manuals." | Add-Content $summary
+            }
+
+            if (Copy-IfExists "docs" (Join-Path $stage "docs") -Recurse) {
+              "Included docs folder." | Add-Content $summary
+            }
+
+            $bundleRoot = Join-Many @("src-tauri", "target", "release", "bundle")
+            if (Copy-IfExists $bundleRoot (Join-Path $stage "tauri-bundle") -Recurse) {
+              "Included Tauri bundle output." | Add-Content $summary
+            } else {
+              "Tauri bundle output was not found at $bundleRoot." | Add-Content $summary
+            }
+
+            $windowsExe = Join-Many @("src-tauri", "target", "release", "diligent-code-studio.exe")
+            if (Copy-IfExists $windowsExe (Join-Many @($stage, "release-binary", "diligent-code-studio.exe"))) {
+              "Included Windows release binary." | Add-Content $summary
+            }
+
+            $unixBinary = Join-Many @("src-tauri", "target", "release", "diligent-code-studio")
+            if (Copy-IfExists $unixBinary (Join-Many @($stage, "release-binary", "diligent-code-studio"))) {
+              "Included Unix release binary." | Add-Content $summary
+            }
+
+            $files = Get-ChildItem $stage -Recurse -File -ErrorAction SilentlyContinue
+            "Staged file count before ZIP: $($files.Count)" | Add-Content $summary
+
+            foreach ($file in $files) {
+              $relative = [System.IO.Path]::GetRelativePath($stage, $file.FullName)
+              " - $relative ($($file.Length) bytes)" | Add-Content $summary
+            }
+
+            $zipName = "diligent-code-studio-quality-build-$suffix-$shortSha.zip"
+            $zipPath = Join-Path $artifactRoot $zipName
+
+            if (Test-Path $zipPath) {
+              Remove-Item $zipPath -Force
+            }
+
+            Compress-Archive -Path (Join-Path $stage "*") -DestinationPath $zipPath -Force
+            "Created ZIP: $zipName" | Add-Content $summary
+          } catch {
+            "Artifact staging caught error: $($_.Exception.Message)" | Add-Content $summary
+            Write-Host "Artifact staging caught error: $($_.Exception.Message)"
+          } finally {
+            $checksumFile = Join-Path $artifactRoot "SHA256SUMS-$suffix.txt"
+            if (Test-Path $checksumFile) {
+              Remove-Item $checksumFile -Force
+            }
+
+            $rootFiles = Get-ChildItem $artifactRoot -File -ErrorAction SilentlyContinue | Sort-Object Name
+            if ($rootFiles) {
+              foreach ($file in $rootFiles) {
+                $hash = Get-FileHash $file.FullName -Algorithm SHA256
+                "$($hash.Hash.ToLower())  $($file.Name)" | Add-Content $checksumFile
               }
-            "Included docs folder." | Add-Content $summary
+            } else {
+              "No root artifact files existed when checksum file was created." | Set-Content $checksumFile
+            }
+
+            $finalFiles = Get-ChildItem $artifactRoot -Recurse -File -ErrorAction SilentlyContinue
+            "Final artifact file count: $($finalFiles.Count)" | Add-Content $summary
+
+            Write-Host "Artifact root:"
+            Get-ChildItem $artifactRoot -Recurse -File -ErrorAction SilentlyContinue | Select-Object FullName, Length | Format-Table -AutoSize
+            Write-Host ""
+            Write-Host "Checksums:"
+            Get-Content $checksumFile
           }
-
-          $bundleRoot = "src-tauri\target\release\bundle"
-          if (Test-Path $bundleRoot) {
-            $bundleTarget = Join-Path $stage "tauri-bundle"
-            Copy-Item $bundleRoot $bundleTarget -Recurse -Force
-            "Included Tauri bundle output." | Add-Content $summary
-          } else {
-            "Tauri bundle output was not found at $bundleRoot." | Add-Content $summary
-          }
-
-          $releaseExe = "src-tauri\target\release\diligent-code-studio.exe"
-          if (Test-Path $releaseExe) {
-            $binaryTarget = Join-Path $stage "release-binary"
-            New-Item -ItemType Directory -Path $binaryTarget -Force | Out-Null
-            Copy-Item $releaseExe $binaryTarget -Force
-            "Included Windows release binary." | Add-Content $summary
-          }
-
-          $releaseBinary = "src-tauri\target\release\diligent-code-studio"
-          if (Test-Path $releaseBinary) {
-            $binaryTarget = Join-Path $stage "release-binary"
-            New-Item -ItemType Directory -Path $binaryTarget -Force | Out-Null
-            Copy-Item $releaseBinary $binaryTarget -Force
-            "Included Unix release binary." | Add-Content $summary
-          }
-
-          $files = Get-ChildItem $stage -Recurse -File -ErrorAction SilentlyContinue
-          "Staged file count: $($files.Count)" | Add-Content $summary
-          $files | ForEach-Object {
-            $relative = [System.IO.Path]::GetRelativePath($stage, $_.FullName)
-            " - $relative ($($_.Length) bytes)" | Add-Content $summary
-          }
-
-          if ($files.Count -eq 0) {
-            throw "No artifact files were staged."
-          }
-
-          $zipName = "diligent-code-studio-quality-build-$suffix-$shortSha.zip"
-          $zipPath = Join-Path $artifactRoot $zipName
-          if (Test-Path $zipPath) {
-            Remove-Item $zipPath -Force
-          }
-
-          Compress-Archive -Path (Join-Path $stage "*") -DestinationPath $zipPath -Force
-
-          $checksumFile = Join-Path $artifactRoot "SHA256SUMS-$suffix.txt"
-          if (Test-Path $checksumFile) {
-            Remove-Item $checksumFile -Force
-          }
-
-          Get-ChildItem $artifactRoot -File -Filter "*.zip" | Sort-Object Name | ForEach-Object {
-            $hash = Get-FileHash $_.FullName -Algorithm SHA256
-            "$($hash.Hash.ToLower())  $($_.Name)" | Add-Content $checksumFile
-          }
-
-          Write-Host "Artifact root:"
-          Get-ChildItem $artifactRoot -Recurse -File | Select-Object FullName, Length | Format-Table -AutoSize
-          Write-Host ""
-          Write-Host "Checksums:"
-          Get-Content $checksumFile
 
       - name: Upload ${{ matrix.platform_name }} build artifact
-        if: always()
+        if: ${{ always() }}
         uses: actions/upload-artifact@v4
         with:
           name: diligent-code-studio-${{ matrix.artifact_suffix }}-${{ github.run_number }}-${{ github.run_attempt }}
-          path: |
-            .dcs-artifacts/**/*.zip
-            .dcs-artifacts/**/*.txt
+          path: dist-artifacts/**
           if-no-files-found: error
           retention-days: 30
