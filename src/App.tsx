@@ -3548,7 +3548,8 @@ ERROR: ${String(error)}
   <span>Local-first AI development workbench - v0.8.0</span>
   </div>
   </div>
-  <div className="app-health-strip" aria-label="Project health summary">
+
+<div className="app-health-strip" aria-label="Project health summary">
   <span className={projectInfo ? 'ok' : 'missing'}>{projectInfo ? `Project: ${projectInfo.project_types.join(', ') || 'Detected'}` : 'Project: Not loaded'}</span>
   <span className={projectInfo?.has_git_repository ? 'ok' : 'missing'}>{projectInfo?.has_git_repository ? 'Git: Ready' : 'Git: Not detected'}</span>
   <span className={setupStats.missingRequired === 0 && setupStats.total > 0 ? 'ok' : 'missing'}>{setupStats.total > 0 ? `Setup: ${setupStats.installed}/${setupStats.total}` : 'Setup: Check needed'}</span>
@@ -3993,24 +3994,37 @@ ERROR: ${String(error)}
 
   <div className="ai-grid">
   <section className="ai-controls-card">
-  <label className="setting-row">
-  <span>Context</span>
-                  <div className="ai-provider-hub-inline-action dcs-ai-page-provider-hub-button">
-                    <button className="secondary-button" type="button" onClick={() => window.dispatchEvent(new Event('dcs-open-ai-provider-hub'))}>
+                  <div className="ai-provider-hub-compact-action ai-provider-hub-top-action dcs-ai-window-provider-hub-button">
+                    <button
+                      className="ai-provider-hub-compact-button"
+                      type="button"
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        window.dispatchEvent(new Event('dcs-open-ai-provider-hub'));
+                      }}
+                    >
                       AI Providers
                     </button>
-                    <span>Connect to Ollama, LM Studio, OpenAI-compatible, or custom AI endpoints.</span>
+                    <span>Connect this AI window to Ollama, LM Studio, OpenAI-compatible, or custom endpoints.</span>
                   </div>
-  <select value={aiContextMode} onChange={(event) => setAiContextMode(event.target.value as AiContextPreference)}>
-  <option value="selection">Selected code / active file fallback</option>
-  <option value="currentFile">Current file</option>
-  <option value="project">Whole project</option>
-  <option value="problems">Problems / diagnostics output</option>
-  <option value="terminal">Recent terminal output</option>
-  <option value="git">Git status summary</option>
-  </select>
-  </label>
-  <textarea
+                    <label className="ai-context-dropdown-field">
+                    <select
+                      className="ai-context-dropdown-only"
+                      value={aiContextMode}
+                      onChange={(event) => setAiContextMode(event.target.value as AiContextPreference)}
+                      aria-label="AI context"
+                    >
+                      <option value="" disabled>Context</option>
+                      <option value="selection">Selected code / active file fallback</option>
+                      <option value="currentFile">Current file</option>
+                      <option value="project">Whole project</option>
+                      <option value="problems">Problems / diagnostics output</option>
+                      <option value="terminal">Recent terminal output</option>
+                      <option value="git">Git status summary</option>
+                    </select>
+                  </label>
+
+<textarea
   className="ai-prompt-box"
   value={aiPrompt}
   onChange={(event) => setAiPrompt(event.target.value)}
@@ -5106,7 +5120,21 @@ ERROR: ${String(error)}
   <section className="panel settings-panel wide-settings-panel">
   <div className="panel-title"><Bot size={16} /> AI Assistant</div>
   <p className="muted-note">AI is optional. OpenAI sends selected context to the OpenAI API. Ollama uses a local endpoint, usually <code>http://127.0.0.1:11434</code>.</p>
-  <label className="setting-row">
+
+                  <div className="ai-provider-hub-compact-action ai-provider-hub-top-action dcs-settings-ai-provider-hub-button dcs-settings-ai-provider-hub-top">
+                    <button
+                      className="ai-provider-hub-compact-button"
+                      type="button"
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        window.dispatchEvent(new Event('dcs-open-ai-provider-hub'));
+                      }}
+                    >
+                      Configure AI Providers
+                    </button>
+                    <span>Manage local and online AI provider profiles. API keys are session-only unless secure storage is added later.</span>
+                  </div>
+<label className="setting-row">
   <span>Provider</span>
   <select value={preferences.aiProvider} onChange={(event) => updatePreference('aiProvider', event.target.value as AiProviderPreference)}>
   <option value="disabled">Disabled</option>
@@ -5172,13 +5200,8 @@ ERROR: ${String(error)}
   </div>
   <label className="setting-row">
   <span>Default AI context</span>
-                  <div className="ai-provider-hub-inline-action dcs-settings-ai-provider-hub-button">
-                    <button className="secondary-button" type="button" onClick={() => window.dispatchEvent(new Event('dcs-open-ai-provider-hub'))}>
-                      Configure AI Providers
-                    </button>
-                    <span>Manage local and online AI provider profiles. API keys are session-only unless secure storage is added later.</span>
-                  </div>
-  <select value={preferences.aiDefaultContext} onChange={(event) => updatePreference('aiDefaultContext', event.target.value as AiContextPreference)}>
+
+<select value={preferences.aiDefaultContext} onChange={(event) => updatePreference('aiDefaultContext', event.target.value as AiContextPreference)}>
   <option value="selection">Selected code</option>
   <option value="currentFile">Current file</option>
   <option value="project">Whole project</option>
@@ -5289,7 +5312,8 @@ ERROR: ${String(error)}
   <span>Step 3</span>
   <strong>Pick AI mode</strong>
   <p>Ollama is recommended for local-first work. You can keep AI disabled until you are ready.</p>
-  <div className="segmented-mode-row wrap-row">
+
+<div className="segmented-mode-row wrap-row">
   <button className={preferences.aiProvider === 'ollama' ? 'active' : ''} onClick={() => updatePreference('aiProvider', 'ollama')}>Ollama</button>
   <button className={preferences.aiProvider === 'openai' ? 'active' : ''} onClick={() => updatePreference('aiProvider', 'openai')}>OpenAI</button>
   <button className={preferences.aiProvider === 'disabled' ? 'active' : ''} onClick={() => updatePreference('aiProvider', 'disabled')}>Disabled</button>
