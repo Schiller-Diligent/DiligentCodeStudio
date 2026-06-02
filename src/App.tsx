@@ -729,7 +729,7 @@ export default function App() {
   const [toolStatuses, setToolStatuses] = useState<ToolStatus[]>([]);
   const [platformInfo, setPlatformInfo] = useState<PlatformInfo | null>(null);
   const [activity, setActivity] = useState<ActivityItem[]>([
-  { at: nowStamp(), level: 'info', message: 'Diligent Code Studio v0.7.0-dev loaded. Startup dependency check will run automatically.' },
+  { at: nowStamp(), level: 'info', message: 'Diligent Code Studio v0.8.0 loaded. Startup dependency check will run automatically.' },
   ]);
   const [terminalCommand, setTerminalCommand] = useState('git status');
   const [terminalOutput, setTerminalOutput] = useState(
@@ -3545,7 +3545,7 @@ ERROR: ${String(error)}
   <div className="app-top-logo"><img className="app-top-logo-image" src="/branding/dss-app-brand-icon.png" alt="Diligent Software Services logo" /></div>
   <div>
   <strong>Diligent Code Studio</strong>
-  <span>Local-first AI development workbench - v0.7.0-dev</span>
+  <span>Local-first AI development workbench - v0.8.0</span>
   </div>
   </div>
   <div className="app-health-strip" aria-label="Project health summary">
@@ -3567,7 +3567,7 @@ ERROR: ${String(error)}
   <div>
   <h1>Diligent Code Studio</h1>
   <p className="brand-tagline">Secure software-building workbench</p>
-  <p>Community Edition v0.7.0-dev</p>
+  <p>Community Edition v0.8.0</p>
   </div>
   </div>
 
@@ -3940,7 +3940,7 @@ ERROR: ${String(error)}
   <div className="welcome-card editor-welcome-card">
   <ShieldCheck size={48} />
   <h2>Open a file to start editing.</h2>
-  <p>Version 0.7.0-dev starts the First Run Setup Wizard track while keeping the streamlined Workspace Menu from v0.7.0-dev.</p>
+  <p>Version 0.7.0-dev starts the First Run Setup Wizard track while keeping the streamlined Workspace Menu from v0.8.0.</p>
   <div className="recent-files-card">
   <div className="recent-files-header">
   <strong>Recent Files</strong>
@@ -4044,7 +4044,7 @@ ERROR: ${String(error)}
   <button onClick={() => prepareProjectAiAction('summarize-project')} disabled={aiBusy}>Summarize Project</button>
   <button onClick={() => prepareProjectAiAction('create-installer-script')} disabled={aiBusy}>Installer Script</button>
   </div>
-  <p className="muted-note">Sensitive files should be excluded with <code>.aiignore</code>. v0.7.0-dev keeps project-wide prompts, web deployment plans, onboarding guidance, hosting help, movable AI Help, open-source acknowledgment guidance, and streamlined workspace navigation while still asking before sending context when enabled.</p>
+  <p className="muted-note">Sensitive files should be excluded with <code>.aiignore</code>. v0.8.0 keeps project-wide prompts, web deployment plans, onboarding guidance, hosting help, movable AI Help, open-source acknowledgment guidance, and streamlined workspace navigation while still asking before sending context when enabled.</p>
   </section>
 
   <section className="ai-response-card">

@@ -1,44 +1,44 @@
 {
-  "name": "diligent-code-studio",
-  "private": true,
-  "version": "0.7.0",
-  "type": "module",
-  "scripts": {
-    "dev": "vite --host 127.0.0.1",
-    "build": "npm run typecheck && vite build",
-    "preview": "vite preview",
-    "tauri": "tauri",
-    "tauri:dev": "tauri dev",
-    "tauri:build": "tauri build",
-    "typecheck": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p tsconfig.node.json",
-    "test": "npm run test:all",
-    "validate": "npm run typecheck && npm run test:all",
-    "audit:npm": "npm audit --audit-level=moderate",
-    "check:rust": "cargo check --manifest-path src-tauri/Cargo.toml",
-    "test:smoke": "node scripts/smoke-test.mjs",
-    "test:unit": "node --test scripts/unit-test.mjs",
-    "test:security": "node scripts/security-check.mjs",
-    "test:rust": "cargo test --manifest-path src-tauri/Cargo.toml",
-    "test:all": "npm run test:smoke && npm run test:unit && npm run test:security",
-    "audit:all": "npm run audit:npm && npm run test:security",
-    "clean": "node scripts/clean.mjs",
-    "quality": "npm run validate && npm run build && npm run audit:npm",
-    "release:check": "npm run quality && npm run check:rust && npm run test:rust"
-  },
-  "dependencies": {
-    "@monaco-editor/react": "4.7.0",
-    "@tauri-apps/api": "2.11.0",
-    "lucide-react": "1.16.0",
-    "monaco-editor": "0.53.0",
-    "react": "19.2.6",
-    "react-dom": "19.2.6"
-  },
-  "devDependencies": {
-    "@tauri-apps/cli": "2.11.2",
-    "@types/react": "19.2.15",
-    "@types/react-dom": "19.2.3",
-    "@vitejs/plugin-react": "6.0.2",
-    "typescript": "6.0.3",
-    "vite": "8.0.14"
-  }
+    "name":  "diligent-code-studio",
+    "private":  true,
+    "version":  "0.8.0",
+    "type":  "module",
+    "scripts":  {
+                    "dev":  "vite --host 127.0.0.1",
+                    "build":  "npm run typecheck \u0026\u0026 vite build",
+                    "preview":  "vite preview",
+                    "tauri":  "tauri",
+                    "tauri:dev":  "tauri dev",
+                    "tauri:build":  "tauri build",
+                    "typecheck":  "tsc --noEmit -p tsconfig.json \u0026\u0026 tsc --noEmit -p tsconfig.node.json",
+                    "test":  "npm run test:all",
+                    "validate":  "npm run typecheck \u0026\u0026 npm run test:all",
+                    "audit:npm":  "npm audit --audit-level=moderate",
+                    "check:rust":  "cargo check --manifest-path src-tauri/Cargo.toml",
+                    "test:smoke":  "node scripts/smoke-test.mjs",
+                    "test:unit":  "node --test scripts/unit-test.mjs",
+                    "test:security":  "node scripts/security-check.mjs",
+                    "test:rust":  "cargo test --manifest-path src-tauri/Cargo.toml",
+                    "test:all":  "npm run test:smoke \u0026\u0026 npm run test:unit \u0026\u0026 npm run test:security",
+                    "audit:all":  "npm run audit:npm \u0026\u0026 npm run test:security",
+                    "clean":  "node scripts/clean.mjs",
+                    "quality":  "npm run validate \u0026\u0026 npm run build \u0026\u0026 npm run audit:npm",
+                    "release:check":  "npm run quality \u0026\u0026 npm run check:rust \u0026\u0026 npm run test:rust"
+                },
+    "dependencies":  {
+                         "@monaco-editor/react":  "4.7.0",
+                         "@tauri-apps/api":  "2.11.0",
+                         "lucide-react":  "1.16.0",
+                         "monaco-editor":  "0.53.0",
+                         "react":  "19.2.6",
+                         "react-dom":  "19.2.6"
+                     },
+    "devDependencies":  {
+                            "@tauri-apps/cli":  "2.11.2",
+                            "@types/react":  "19.2.15",
+                            "@types/react-dom":  "19.2.3",
+                            "@vitejs/plugin-react":  "6.0.2",
+                            "typescript":  "6.0.3",
+                            "vite":  "8.0.14"
+                        }
 }

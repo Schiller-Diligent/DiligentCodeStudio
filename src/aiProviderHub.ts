@@ -46,7 +46,7 @@ export type AiProviderResponse = {
   raw: unknown;
 };
 
-export const AI_PROVIDER_HUB_VERSION = '0.8.0-foundation';
+export const AI_PROVIDER_HUB_VERSION = '0.8.0';
 
 export const DEFAULT_AI_PROVIDER_PROFILES: AiProviderProfile[] = [
   {
@@ -121,8 +121,8 @@ export function normalizeBaseUrl(baseUrl: string): string {
 export function maskApiKey(apiKey?: string): string {
   if (!apiKey) return '';
   const trimmed = apiKey.trim();
-  if (trimmed.length <= 8) return 'â€¢â€¢â€¢â€¢';
-  return `${trimmed.slice(0, 4)}â€¢â€¢â€¢â€¢${trimmed.slice(-4)}`;
+  if (trimmed.length <= 8) return 'Ã¢â‚¬Â¢Ã¢â‚¬Â¢Ã¢â‚¬Â¢Ã¢â‚¬Â¢';
+  return `${trimmed.slice(0, 4)}Ã¢â‚¬Â¢Ã¢â‚¬Â¢Ã¢â‚¬Â¢Ã¢â‚¬Â¢${trimmed.slice(-4)}`;
 }
 
 export function cloneProviderWithoutSecret(profile: AiProviderProfile): AiProviderProfile {
