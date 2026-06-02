@@ -5121,6 +5121,7 @@ ERROR: ${String(error)}
   <div className="panel-title"><Bot size={16} /> AI Assistant</div>
   <p className="muted-note">AI is optional. OpenAI sends selected context to the OpenAI API. Ollama uses a local endpoint, usually <code>http://127.0.0.1:11434</code>.</p>
 
+
                   <div className="ai-provider-hub-compact-action ai-provider-hub-top-action dcs-settings-ai-provider-hub-button dcs-settings-ai-provider-hub-top">
                     <button
                       className="ai-provider-hub-compact-button"
