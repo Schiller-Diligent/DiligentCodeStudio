@@ -230,7 +230,7 @@ export default function AiProviderHubPanel({ open, onClose }: AiProviderHubPanel
             <h2>AI Provider Hub</h2>
             <p>Connect Diligent Code Studio to local or online AI providers using provider profiles.</p>
           </div>
-          <button className="ai-provider-hub-close" type="button" onClick={onClose} aria-label="Close AI Provider Hub">Ã—</button>
+          <button className="ai-provider-hub-close" type="button" onClick={onClose} aria-label="Close AI Provider Hub">X</button>
         </header>
 
         <div className="ai-provider-hub-layout">
@@ -249,7 +249,7 @@ export default function AiProviderHubPanel({ open, onClose }: AiProviderHubPanel
                   }}
                 >
                   <strong>{profile.name}</strong>
-                  <span>{providerKindLabel(profile.kind)} â€¢ {profile.model || 'No model'}</span>
+                  <span>{providerKindLabel(profile.kind)} - {profile.model || 'No model'}</span>
                 </button>
               ))}
             </div>

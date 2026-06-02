@@ -754,7 +754,7 @@ dependencies = [
 
 [[package]]
 name = "diligent-code-studio"
-version = "0.7.0"
+version = "0.8.0"
 dependencies = [
  "hex",
  "reqwest 0.12.28",

@@ -121,8 +121,8 @@ export function normalizeBaseUrl(baseUrl: string): string {
 export function maskApiKey(apiKey?: string): string {
   if (!apiKey) return '';
   const trimmed = apiKey.trim();
-  if (trimmed.length <= 8) return 'Ã¢â‚¬Â¢Ã¢â‚¬Â¢Ã¢â‚¬Â¢Ã¢â‚¬Â¢';
-  return `${trimmed.slice(0, 4)}Ã¢â‚¬Â¢Ã¢â‚¬Â¢Ã¢â‚¬Â¢Ã¢â‚¬Â¢${trimmed.slice(-4)}`;
+  if (trimmed.length <= 8) return '****';
+  return trimmed.slice(0, 4) + '****' + trimmed.slice(-4);
 }
 
 export function cloneProviderWithoutSecret(profile: AiProviderProfile): AiProviderProfile {
