@@ -46,7 +46,7 @@ export type AiProviderResponse = {
   raw: unknown;
 };
 
-export const AI_PROVIDER_HUB_VERSION = '0.8.0';
+export const AI_PROVIDER_HUB_VERSION = '0.9.0';
 
 export const DEFAULT_AI_PROVIDER_PROFILES: AiProviderProfile[] = [
   {

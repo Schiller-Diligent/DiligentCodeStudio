@@ -226,7 +226,7 @@ export default function AiProviderHubPanel({ open, onClose }: AiProviderHubPanel
       <div className="ai-provider-hub-dialog">
         <header className="ai-provider-hub-header">
           <div>
-            <p className="ai-provider-hub-eyebrow">v0.8.0 foundation</p>
+            <p className="ai-provider-hub-eyebrow">v0.9.0 foundation</p>
             <h2>AI Provider Hub</h2>
             <p>Connect Diligent Code Studio to local or online AI providers using provider profiles.</p>
           </div>

@@ -1,5 +1,115 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
+fn dcs_find_workspace_root() -> Result<std::path::PathBuf, String> {
+    let current = std::env::current_dir()
+        .map_err(|error| format!("Could not read current directory: {error}"))?;
+
+    let mut cursor = Some(current.as_path());
+
+    while let Some(dir) = cursor {
+        let has_package = dir.join("package.json").exists();
+        let has_src = dir.join("src").exists();
+        let has_tauri = dir.join("src-tauri").exists();
+
+        if has_package && has_src {
+            return Ok(dir.to_path_buf());
+        }
+
+        if has_package && has_tauri {
+            return Ok(dir.to_path_buf());
+        }
+
+        cursor = dir.parent();
+    }
+
+    Err("Could not locate the Diligent Code Studio workspace root.".to_string())
+}
+
+fn dcs_is_safe_relative_path(path: &std::path::Path) -> bool {
+    path.components().all(|component| {
+        matches!(
+            component,
+            std::path::Component::Normal(_) | std::path::Component::CurDir
+        )
+    })
+}
+
+fn dcs_resolve_source_path(file: &str) -> Result<std::path::PathBuf, String> {
+    let cleaned = file.trim().replace('\\', "/");
+
+    if cleaned.is_empty() {
+        return Err("Source file path was empty.".to_string());
+    }
+
+    if cleaned.contains('\0') {
+        return Err("Source file path contained an invalid null character.".to_string());
+    }
+
+    let workspace_root = dcs_find_workspace_root()?;
+    let root_canonical = workspace_root
+        .canonicalize()
+        .map_err(|error| format!("Could not canonicalize workspace root: {error}"))?;
+
+    let input_path = std::path::PathBuf::from(&cleaned);
+
+    let candidate = if input_path.is_absolute() {
+        input_path
+    } else {
+        if !dcs_is_safe_relative_path(&input_path) {
+            return Err(format!("Unsafe relative source path rejected: {cleaned}"));
+        }
+
+        workspace_root.join(input_path)
+    };
+
+    let resolved = if candidate.exists() {
+        candidate
+            .canonicalize()
+            .map_err(|error| format!("Could not canonicalize source path {cleaned}: {error}"))?
+    } else {
+        let parent = candidate
+            .parent()
+            .ok_or_else(|| format!("Source path did not have a parent directory: {cleaned}"))?;
+
+        let parent_canonical = parent
+            .canonicalize()
+            .map_err(|error| format!("Could not find source parent directory for {cleaned}: {error}"))?;
+
+        let file_name = candidate
+            .file_name()
+            .ok_or_else(|| format!("Source path did not include a file name: {cleaned}"))?;
+
+        parent_canonical.join(file_name)
+    };
+
+    if !resolved.starts_with(&root_canonical) {
+        return Err(format!(
+            "Source path is outside the workspace and was rejected: {}",
+            resolved.display()
+        ));
+    }
+
+    Ok(resolved)
+}
+
+#[tauri::command]
+fn dcs_read_text_file(file: String) -> Result<(String, String), String> {
+    let path = dcs_resolve_source_path(&file)?;
+    let content = std::fs::read_to_string(&path)
+        .map_err(|error| format!("Could not read {}: {error}", path.display()))?;
+
+    Ok((path.to_string_lossy().to_string(), content))
+}
+
+#[tauri::command]
+fn dcs_write_text_file(file: String, content: String) -> Result<(), String> {
+    let path = dcs_resolve_source_path(&file)?;
+
+    std::fs::write(&path, content)
+        .map_err(|error| format!("Could not write {}: {error}", path.display()))?;
+
+    Ok(())
+}
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::fs;
@@ -3066,44 +3176,7 @@ fn calculate_sha256(path: String) -> Result<String, String> {
 
 fn run_app() -> Result<(), tauri::Error> {
     tauri::Builder::default()
-        .invoke_handler(tauri::generate_handler![
-            pick_workspace_folder,
-            list_workspace,
-            list_directory,
-            read_text_file,
-            write_text_file,
-            save_text_file_as,
-            create_text_file,
-            create_folder,
-            rename_path,
-            delete_path,
-            run_terminal_command,
-            open_powershell_window,
-            calculate_sha256,
-            detect_project,
-            check_development_tools,
-            check_setup_dependencies,
-            install_setup_dependency,
-            open_external_url,
-            get_platform_info,
-            search_workspace,
-            git_init,
-            git_status,
-            git_stage_all,
-            git_stage_file,
-            git_unstage_file,
-            git_commit,
-            git_create_tag,
-            get_release_info,
-            create_release_package,
-            open_release_folder,
-            run_diagnostics,
-            get_project_templates,
-            create_project_from_template,
-            list_ollama_models,
-            get_ollama_status,
-            ai_chat
-        ])
+        .invoke_handler(tauri::generate_handler![pick_workspace_folder, list_workspace, list_directory, read_text_file, write_text_file, save_text_file_as, create_text_file, create_folder, rename_path, delete_path, run_terminal_command, open_powershell_window, calculate_sha256, detect_project, check_development_tools, check_setup_dependencies, install_setup_dependency, open_external_url, get_platform_info, search_workspace, git_init, git_status, git_stage_all, git_stage_file, git_unstage_file, git_commit, git_create_tag, get_release_info, create_release_package, open_release_folder, run_diagnostics, get_project_templates, create_project_from_template, list_ollama_models, get_ollama_status, ai_chat, dcs_read_text_file, dcs_write_text_file])
         .run(tauri::generate_context!())
 }
 

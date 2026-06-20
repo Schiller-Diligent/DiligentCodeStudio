@@ -1,0 +1,178 @@
+.dcs-codemirror-editor-shell {
+  width: 100% !important;
+  max-width: none !important;
+  min-width: 0 !important;
+  height: calc(100vh - 260px) !important;
+  min-height: calc(100vh - 260px) !important;
+  flex: 1 1 auto !important;
+  display: grid !important;
+  grid-template-columns: 64px minmax(0, 1fr) 118px !important;
+  gap: 8px !important;
+  overflow: hidden !important;
+  border-radius: 12px !important;
+  background: #020617 !important;
+  box-sizing: border-box !important;
+  outline: none !important;
+}
+
+.dcs-codemirror-line-gutter-panel {
+  width: 64px !important;
+  min-width: 64px !important;
+  height: calc(100vh - 260px) !important;
+  min-height: calc(100vh - 260px) !important;
+  max-height: calc(100vh - 260px) !important;
+  overflow: hidden !important;
+  border-right: 1px solid rgba(148, 163, 184, 0.22) !important;
+  background: #0f172a !important;
+  border-radius: 12px 0 0 12px !important;
+  box-sizing: border-box !important;
+}
+
+.dcs-codemirror-line-gutter {
+  width: 100% !important;
+  height: calc(100vh - 260px) !important;
+  min-height: calc(100vh - 260px) !important;
+  max-height: calc(100vh - 260px) !important;
+  margin: 0 !important;
+  padding: 16px 8px 120px 4px !important;
+  overflow: hidden !important;
+  box-sizing: border-box !important;
+  text-align: right !important;
+  color: rgba(203, 213, 225, 0.78) !important;
+  background: #0f172a !important;
+  font-family: "Cascadia Code", Consolas, "Courier New", monospace !important;
+  font-size: inherit !important;
+  line-height: var(--dcs-editor-line-height, 21.7px) !important;
+  white-space: pre !important;
+  user-select: none !important;
+}
+
+.dcs-codemirror-main {
+  width: 100% !important;
+  min-width: 0 !important;
+  height: calc(100vh - 260px) !important;
+  min-height: calc(100vh - 260px) !important;
+  max-height: calc(100vh - 260px) !important;
+  overflow: hidden !important;
+  border-radius: 0 !important;
+  background: #0f172a !important;
+  position: relative !important;
+}
+
+.dcs-codemirror-main .cm-editor {
+  width: 100% !important;
+  height: calc(100vh - 260px) !important;
+  min-height: calc(100vh - 260px) !important;
+  max-height: calc(100vh - 260px) !important;
+  overflow: hidden !important;
+}
+
+.dcs-codemirror-main .cm-scroller {
+  width: 100% !important;
+  height: calc(100vh - 260px) !important;
+  min-height: calc(100vh - 260px) !important;
+  max-height: calc(100vh - 260px) !important;
+  overflow-y: scroll !important;
+  overflow-x: auto !important;
+  scrollbar-gutter: stable both-edges !important;
+  overscroll-behavior: contain !important;
+}
+
+.dcs-codemirror-main .cm-content {
+  min-height: auto !important;
+  padding-bottom: 120px !important;
+}
+
+.dcs-codemirror-main .cm-line {
+  padding-right: 24px !important;
+  line-height: var(--dcs-editor-line-height, 21.7px) !important;
+}
+
+.dcs-codemirror-main .cm-gutters {
+  display: none !important;
+}
+
+.dcs-codemirror-minimap-panel {
+  width: 118px !important;
+  min-width: 118px !important;
+  height: calc(100vh - 260px) !important;
+  min-height: calc(100vh - 260px) !important;
+  max-height: calc(100vh - 260px) !important;
+  overflow: hidden !important;
+  border-left: 1px solid rgba(148, 163, 184, 0.22) !important;
+  background: rgba(15, 23, 42, 0.96) !important;
+  border-radius: 0 12px 12px 0 !important;
+  box-sizing: border-box !important;
+  position: relative !important;
+}
+
+.dcs-codemirror-minimap-viewport {
+  position: absolute !important;
+  left: 2px !important;
+  right: 8px !important;
+  min-height: 12px !important;
+  border: 1px solid rgba(96, 165, 250, 0.75) !important;
+  background: rgba(96, 165, 250, 0.16) !important;
+  border-radius: 4px !important;
+  pointer-events: none !important;
+  z-index: 2 !important;
+}
+
+.dcs-codemirror-minimap {
+  position: relative !important;
+  z-index: 1 !important;
+  width: 100% !important;
+  height: calc(100vh - 260px) !important;
+  min-height: calc(100vh - 260px) !important;
+  max-height: calc(100vh - 260px) !important;
+  margin: 0 !important;
+  padding: 6px 4px !important;
+  overflow-y: scroll !important;
+  overflow-x: hidden !important;
+  box-sizing: border-box !important;
+  cursor: pointer !important;
+  user-select: none !important;
+  white-space: pre !important;
+  color: rgba(191, 219, 254, 0.46) !important;
+  background: transparent !important;
+  font-family: "Cascadia Code", Consolas, "Courier New", monospace !important;
+  font-size: 2.5px !important;
+  line-height: 3.6px !important;
+  letter-spacing: -0.2px !important;
+  scrollbar-width: thin !important;
+}
+
+.dcs-codemirror-minimap::-webkit-scrollbar,
+.dcs-codemirror-main .cm-scroller::-webkit-scrollbar {
+  width: 12px !important;
+  height: 12px !important;
+}
+
+.dcs-codemirror-minimap::-webkit-scrollbar-thumb,
+.dcs-codemirror-main .cm-scroller::-webkit-scrollbar-thumb {
+  background: rgba(96, 165, 250, 0.5) !important;
+  border-radius: 999px !important;
+}
+
+.dcs-codemirror-minimap::-webkit-scrollbar-track,
+.dcs-codemirror-main .cm-scroller::-webkit-scrollbar-track {
+  background: rgba(15, 23, 42, 0.75) !important;
+}
+
+.editor-canvas:has(.dcs-codemirror-editor-shell) {
+  display: flex !important;
+  flex: 1 1 auto !important;
+  min-height: calc(100vh - 260px) !important;
+  height: calc(100vh - 260px) !important;
+  overflow: hidden !important;
+}
+
+.editor-wrap:has(.dcs-codemirror-editor-shell),
+.editor-ai-layout:has(.dcs-codemirror-editor-shell) {
+  min-height: calc(100vh - 260px) !important;
+  overflow: hidden !important;
+}
+
+.dcs-emergency-visible-code-editor {
+  display: none !important;
+}

@@ -1,4 +1,6 @@
 import { invoke } from '@tauri-apps/api/core';
+import { DcsCodeMirrorEditor } from "./dcs-editor/DcsCodeMirrorEditor";
+import { DcsSafeLivePreview } from "./dcs-live-preview/DcsSafeLivePreview";
 import {
   AlertTriangle,
   Bot,
@@ -127,7 +129,8 @@ type QuickCommand = {
   className?: string;
 };
 
-type WorkspacePage = 'templates' | 'start' | 'web' | 'setup' | 'editor' | 'ai' | 'findsearch' | 'terminal' | 'git' | 'problems' | 'release' | 'registry' | 'project' | 'logs' | 'credits' | 'settings';
+type WorkspacePage = 'templates' | 'start' | 'web' | 'setup' | 'editor' | 'ai' | 'findsearch' | 'terminal' | 'git' | 'problems' | 'release' | 'registry' | 'project' | 'logs' | 'credits' | 'settings'
+  | 'livepreview';
 type BottomPanelTab = 'terminal' | 'problems' | 'output' | 'build' | 'aiLog';
 type MenuDropPlacement = 'before' | 'after';
 
@@ -219,6 +222,7 @@ const DEFAULT_PAGE_ORDER: WorkspacePage[] = [
   'start',
   'web',
   'editor',
+  'livepreview',
   'ai',
   'terminal',
   'git',
@@ -234,6 +238,7 @@ const DEFAULT_PAGE_ORDER: WorkspacePage[] = [
 function workspacePageLabel(page: WorkspacePage): string {
   switch (page) {
   case 'editor': return 'Editor';
+  case 'livepreview': return 'Live Preview';
   case 'ai': return 'AI';
   case 'findsearch': return 'Find/Search';
   case 'terminal': return 'Terminal';
@@ -312,12 +317,12 @@ function clampNumber(value: unknown, fallback: number, min: number, max: number)
 function normalizeWorkspacePage(value: unknown): WorkspacePage {
   const page = String(value);
   if (page === 'find' || page === 'search' || page === 'findsearch') return 'findsearch';
-  if (['editor', 'ai', 'terminal', 'git', 'problems', 'release', 'templates', 'start', 'web', 'setup', 'registry', 'project', 'logs', 'credits', 'settings'].includes(page)) return page as WorkspacePage;
+  if (['livepreview', 'editor', 'ai', 'terminal', 'git', 'problems', 'release', 'templates', 'start', 'web', 'setup', 'registry', 'project', 'logs', 'credits', 'settings'].includes(page)) return page as WorkspacePage;
   return DEFAULT_PREFERENCES.lastActivePage;
 }
 
 function isWorkspacePage(value: unknown): value is WorkspacePage {
-  return ['editor', 'ai', 'findsearch', 'terminal', 'git', 'problems', 'release', 'templates', 'start', 'web', 'setup', 'registry', 'project', 'logs', 'credits', 'settings'].includes(String(value));
+  return ['livepreview', 'editor', 'ai', 'findsearch', 'terminal', 'git', 'problems', 'release', 'templates', 'start', 'web', 'setup', 'registry', 'project', 'logs', 'credits', 'settings'].includes(String(value));
 }
 
 function loadPreferences(): AppPreferences {
@@ -729,7 +734,7 @@ export default function App() {
   const [toolStatuses, setToolStatuses] = useState<ToolStatus[]>([]);
   const [platformInfo, setPlatformInfo] = useState<PlatformInfo | null>(null);
   const [activity, setActivity] = useState<ActivityItem[]>([
-  { at: nowStamp(), level: 'info', message: 'Diligent Code Studio v0.8.0 loaded. Startup dependency check will run automatically.' },
+  { at: nowStamp(), level: 'info', message: 'Diligent Code Studio v0.9.0 loaded. Startup dependency check will run automatically.' },
   ]);
   const [terminalCommand, setTerminalCommand] = useState('git status');
   const [terminalOutput, setTerminalOutput] = useState(
@@ -1038,6 +1043,7 @@ export default function App() {
   const activePageTitle = useMemo(() => {
   switch (activePage) {
   case 'editor': return activeFile ? activeFile.name : 'Editor';
+  case 'livepreview': return 'Live Preview';
   case 'ai': return 'AI Coding Assistant';
   case 'findsearch': return findSearchMode === 'current' ? 'Find / Replace Current File' : 'Search Across Workspace';
   case 'terminal': return 'Terminal';
@@ -1056,6 +1062,21 @@ export default function App() {
   default: return 'Diligent Code Studio';
   }
   }, [activeFile, activePage, findSearchMode]);
+
+  useEffect(() => {
+  // DCS_LIVE_PREVIEW_MENU_REPAIR_V1
+  setPreferences((current) => {
+  const nextOrder = normalizePageOrder(current.menuPageOrder);
+  if (nextOrder.includes('livepreview') && nextOrder.length === current.menuPageOrder.length && nextOrder.every((page, index) => page === current.menuPageOrder[index])) {
+  return current;
+  }
+
+  return {
+  ...current,
+  menuPageOrder: nextOrder,
+  };
+  });
+  }, []);
 
   useEffect(() => {
   refreshPlatformInfo();
@@ -1144,6 +1165,94 @@ export default function App() {
   log('error', `Auto-save failed: ${String(error)}`);
   }
   }, preferences.autoSaveDelaySeconds * 1000);
+
+  useEffect(() => {
+  // DCS_LIVE_PREVIEW_OPEN_CODE_BRIDGE_V1
+  function normalizeLivePreviewSourcePath(rawPath: string): string {
+  const value = String(rawPath || '').trim();
+
+  if (!value) {
+  return '';
+  }
+
+  let clean = value
+  .replace(/^file:\/\//i, '')
+  .replace(/^webpack:\/\//i, '')
+  .replace(/^vite:\/\//i, '')
+  .replace(/^\/?@fs\//i, '')
+  .replace(/^\/?\[project\]\//i, '')
+  .replace(/^\/?\.\//, '');
+
+  clean = clean.replace(/^\/(https?:\/\/[^/]+\/)?/i, '');
+
+  const windowsDriveMatch = clean.match(/^\/?([A-Za-z]:[\\/].*)$/);
+  if (windowsDriveMatch) {
+  return windowsDriveMatch[1].replace(/\//g, '\\');
+  }
+
+  if (/^[A-Za-z]:[\\/]/.test(clean)) {
+  return clean.replace(/\//g, '\\');
+  }
+
+  const srcIndex = clean.replace(/\\/g, '/').lastIndexOf('/src/');
+  if (srcIndex >= 0) {
+  clean = clean.replace(/\\/g, '/').slice(srcIndex + 1);
+  }
+
+  clean = clean.replace(/^\/?/, '');
+
+  if (clean.startsWith('src/') || clean.startsWith('src\\')) {
+  const separator = workspacePath.includes('\\') ? '\\' : '/';
+  return workspacePath.replace(/[\\/]+$/, '') + separator + clean.replace(/[\\/]/g, separator);
+  }
+
+  const separator = workspacePath.includes('\\') ? '\\' : '/';
+  return workspacePath.replace(/[\\/]+$/, '') + separator + clean.replace(/[\\/]/g, separator);
+  }
+
+  async function handleLivePreviewOpenCode(event: Event) {
+  const detail = (event as CustomEvent<{
+  filePath?: string;
+  path?: string;
+  file?: string;
+  lineNumber?: number;
+  line?: number;
+  column?: number;
+  length?: number;
+  source?: string;
+  selector?: string;
+  }>).detail;
+
+  const rawPath = detail?.filePath || detail?.path || detail?.file || '';
+  const filePath = normalizeLivePreviewSourcePath(rawPath);
+  const lineNumber = Math.max(Number(detail?.lineNumber ?? detail?.line ?? 1), 1);
+  const column = Math.max(Number(detail?.column ?? 1), 1);
+  const length = Math.max(Number(detail?.length ?? 1), 1);
+
+  if (!filePath) {
+  log('warn', 'Live Preview selected an element, but no source file path was available.');
+  setActivePage('editor');
+  return;
+  }
+
+  setActivePage('editor');
+  setPendingEditorLocation({ path: filePath, lineNumber, column, length });
+
+  try {
+  await openFileByPath(filePath);
+  log('success', `Live Preview opened source: ${filePath}:${lineNumber}:${column}`);
+  } catch (error) {
+  log('error', `Live Preview could not open source file: ${filePath}. ${String(error)}`);
+  }
+  }
+
+  window.addEventListener('dcs-live-preview-open-code', handleLivePreviewOpenCode as EventListener);
+
+  return () => {
+  window.removeEventListener('dcs-live-preview-open-code', handleLivePreviewOpenCode as EventListener);
+  };
+  }, [workspacePath]);
+
 
   return () => window.clearTimeout(timer);
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -1461,6 +1570,7 @@ export default function App() {
   function workspacePageIcon(page: WorkspacePage) {
   switch (page) {
   case 'editor': return <FileCode2 size={14} />;
+  case 'livepreview': return <Globe2 size={14} />;
   case 'ai': return <Bot size={14} />;
   case 'findsearch': return <Search size={14} />;
   case 'terminal': return <TerminalSquare size={14} />;
@@ -1509,6 +1619,13 @@ export default function App() {
   summary: 'Check whether this computer has the tools needed for coding, AI, Git, websites, installers, and desktop builds.',
   nextStep: 'Click Check Again, then install only the missing tools you actually need for your project type.',
   prompt: 'Explain which setup dependencies I need for this project and what I should install next.',
+  };
+  case 'livepreview':
+  return {
+  title: 'Live Preview',
+  summary: 'Preview a running local web app or Vite project inside Diligent Code Studio.',
+  nextStep: 'Start your project server from Terminal, then open its local URL in Live Preview.',
+  prompt: 'Explain how to use Live Preview safely with my current workspace.',
   };
   case 'editor':
   return {
@@ -2132,6 +2249,38 @@ export default function App() {
   );
   }
 
+
+  function updateEmergencyVisibleEditorCursor(element: HTMLTextAreaElement) {
+    const position = Math.max(element.selectionStart ?? 0, 0);
+    const beforeCursor = element.value.slice(0, position);
+    const lines = beforeCursor.split('\n');
+    const lineNumber = Math.max(lines.length, 1);
+    const column = Math.max((lines[lines.length - 1]?.length ?? 0) + 1, 1);
+
+    setCursorPosition({ lineNumber, column });
+  }
+
+  function handleEmergencyVisibleEditorKeyDown(event: any) {
+    if (event.key !== 'Tab') {
+      return;
+    }
+
+    event.preventDefault();
+
+    const element = event.currentTarget as HTMLTextAreaElement;
+    const start = element.selectionStart ?? 0;
+    const end = element.selectionEnd ?? start;
+    const nextValue = `${element.value.slice(0, start)}  ${element.value.slice(end)}`;
+
+    updateActiveContent(nextValue);
+
+    window.setTimeout(() => {
+      element.selectionStart = start + 2;
+      element.selectionEnd = start + 2;
+      updateEmergencyVisibleEditorCursor(element);
+    }, 0);
+  }
+
   function handleEditorBeforeMount(monaco: any) {
   registerDiligentLanguages(monaco);
   }
@@ -2150,8 +2299,13 @@ export default function App() {
   }
 
   function formatActiveDocument() {
-  if (!activeFile || !editorRef.current) {
+  if (!activeFile) {
   log('warn', 'Open a file before formatting.');
+  return;
+  }
+
+  if (document.querySelector('.dcs-emergency-visible-code-editor')) {
+  log('warn', 'Emergency Visible Editor mode does not run Monaco formatters. Save still works normally.');
   return;
   }
 
@@ -3538,6 +3692,213 @@ ERROR: ${String(error)}
   saveAiHelpPosition(clamped);
   }
 
+  useEffect(() => {
+  // DCS_LIVE_PREVIEW_FUZZY_PICKER_BRIDGE_V1
+  function cleanPickedValue(value: unknown, maxLength = 120): string {
+  return String(value || '').replace(/\s+/g, ' ').trim().slice(0, maxLength);
+  }
+
+  function normalizePickedSourcePath(rawPath: string): string {
+  let clean = String(rawPath || '').trim();
+
+  if (!clean) return '';
+
+  clean = clean
+  .replace(/^file:\/\//i, '')
+  .replace(/^webpack:\/\//i, '')
+  .replace(/^vite:\/\//i, '')
+  .replace(/^\/?@fs\//i, '')
+  .replace(/^\/?\[project\]\//i, '')
+  .replace(/^\/?\.\//, '')
+  .replace(/\\/g, '/');
+
+  const srcIndex = clean.lastIndexOf('/src/');
+  if (srcIndex >= 0) clean = clean.slice(srcIndex + 1);
+
+  if (/^[A-Za-z]:\//.test(clean)) {
+  return clean.replace(/\//g, '\\');
+  }
+
+  const separator = workspacePath.includes('\\') ? '\\' : '/';
+  const workspaceRoot = workspacePath.replace(/[\\/]+$/, '');
+
+  if (clean.startsWith('src/')) {
+  return workspaceRoot + separator + clean.replace(/[\\/]/g, separator);
+  }
+
+  return workspaceRoot + separator + clean.replace(/[\\/]/g, separator);
+  }
+
+  function buildElementSearchQueries(detail: any): string[] {
+  const queries: string[] = [];
+  const add = (value: unknown) => {
+  const cleaned = cleanPickedValue(value, 100);
+  if (cleaned.length >= 2 && !queries.includes(cleaned)) {
+  queries.push(cleaned);
+  }
+  };
+
+  if (detail?.id) {
+  add(`id="${detail.id}"`);
+  add(`id='${detail.id}'`);
+  add(detail.id);
+  }
+
+  if (detail?.ariaLabel) {
+  add(`aria-label="${detail.ariaLabel}"`);
+  add(detail.ariaLabel);
+  }
+
+  if (detail?.title) {
+  add(`title="${detail.title}"`);
+  add(detail.title);
+  }
+
+  if (detail?.placeholder) {
+  add(`placeholder="${detail.placeholder}"`);
+  add(detail.placeholder);
+  }
+
+  if (detail?.className) {
+  const classes = String(detail.className).split(/\s+/).filter(Boolean).slice(0, 4);
+  for (const className of classes) {
+  add(className);
+  }
+  }
+
+  if (detail?.text) {
+  const textValue = cleanPickedValue(detail.text, 80);
+  if (textValue.length >= 3 && textValue.length <= 80) {
+  add(textValue);
+  }
+
+  const shorter = textValue.split(/[.!?]/)[0]?.trim();
+  if (shorter && shorter.length >= 3 && shorter.length <= 60) {
+  add(shorter);
+  }
+  }
+
+  if (detail?.tagName) {
+  add(`<${String(detail.tagName).toLowerCase()}`);
+  }
+
+  return queries.slice(0, 10);
+  }
+
+  function scoreLivePreviewSearchResult(result: SearchResult, detail: any, query: string): number {
+  const pathText = String(result.path || result.relative_path || '').toLowerCase();
+  const lineText = String((result as any).line || (result as any).preview || (result as any).text || '').toLowerCase();
+  let score = 0;
+
+  if (/\.(tsx|jsx)$/.test(pathText)) score += 40;
+  if (/\.(ts|js)$/.test(pathText)) score += 12;
+  if (pathText.includes('node_modules')) score -= 1000;
+  if (pathText.includes('dcs-live-preview')) score -= 100;
+
+  const tagName = String(detail?.tagName || '').toLowerCase();
+  if (tagName && lineText.includes(`<${tagName}`)) score += 35;
+
+  if (detail?.id && lineText.includes(String(detail.id).toLowerCase())) score += 30;
+  if (detail?.ariaLabel && lineText.includes(String(detail.ariaLabel).toLowerCase())) score += 25;
+  if (detail?.title && lineText.includes(String(detail.title).toLowerCase())) score += 20;
+  if (detail?.placeholder && lineText.includes(String(detail.placeholder).toLowerCase())) score += 20;
+
+  if (detail?.className) {
+  for (const className of String(detail.className).split(/\s+/).filter(Boolean)) {
+  if (lineText.includes(className.toLowerCase())) score += 8;
+  }
+  }
+
+  if (detail?.text) {
+  const textValue = cleanPickedValue(detail.text, 80).toLowerCase();
+  if (textValue && lineText.includes(textValue)) score += 25;
+  }
+
+  if (query && lineText.includes(String(query).toLowerCase())) score += 10;
+
+  return score;
+  }
+
+  async function openLivePreviewLocatedResult(result: SearchResult, detail: any, query: string) {
+  const lineNumber = Math.max(Number(result.line_number || 1), 1);
+  const column = Math.max(Number(result.column || 1), 1);
+  const length = Math.max(cleanPickedValue(query, 120).length, 1);
+
+  setPendingEditorLocation({
+  path: result.path,
+  lineNumber,
+  column,
+  length,
+  });
+
+  await openFileByPath(result.path);
+  setActivePage('editor');
+  setSelectedEntry(entries.find((entry) => entry.path === result.path) ?? null);
+  log('success', `Live Preview opened likely source: ${result.relative_path || result.path}:${lineNumber}:${column}`);
+  }
+
+  async function handleLivePreviewPickedElement(event: Event) {
+  const detail = (event as CustomEvent<any>).detail || {};
+
+  const directPath = normalizePickedSourcePath(detail.filePath || detail.path || detail.file || '');
+  const directLine = Math.max(Number(detail.lineNumber || detail.line || 1), 1);
+  const directColumn = Math.max(Number(detail.column || 1), 1);
+  const directLength = Math.max(Number(detail.length || 1), 1);
+
+  if (directPath) {
+  setPendingEditorLocation({ path: directPath, lineNumber: directLine, column: directColumn, length: directLength });
+  await openFileByPath(directPath);
+  setActivePage('editor');
+  setSelectedEntry(entries.find((entry) => entry.path === directPath) ?? null);
+  log('success', `Live Preview opened source metadata: ${directPath}:${directLine}:${directColumn}`);
+  return;
+  }
+
+  const queries = buildElementSearchQueries(detail);
+  if (queries.length === 0) {
+  log('warn', 'Live Preview selected an element, but it did not provide enough information to search source files.');
+  return;
+  }
+
+  let best: { result: SearchResult; score: number; query: string } | null = null;
+
+  for (const query of queries) {
+  try {
+  const results = await invoke<SearchResult[]>('search_workspace', {
+  workspacePath,
+  query,
+  caseSensitive: false,
+  wholeWord: false,
+  extensionFilter: '',
+  });
+
+  for (const result of results) {
+  const score = scoreLivePreviewSearchResult(result, detail, query);
+  if (!best || score > best.score) {
+  best = { result, score, query };
+  }
+  }
+  } catch (error) {
+  log('warn', `Live Preview source search failed for "${query}": ${String(error)}`);
+  }
+  }
+
+  if (best && best.score > -500) {
+  await openLivePreviewLocatedResult(best.result, detail, best.query);
+  return;
+  }
+
+  log('warn', `Live Preview selected ${detail.tagName || 'element'}, but no matching source location was found. Try adding a unique id, aria-label, or visible text to that element.`);
+  }
+
+  window.addEventListener('dcs-live-preview-pick-element', handleLivePreviewPickedElement as EventListener);
+
+  return () => {
+  window.removeEventListener('dcs-live-preview-pick-element', handleLivePreviewPickedElement as EventListener);
+  };
+  }, [workspacePath, entries]);
+
+
   return (
   <main className={`app-shell v050-shell theme-${preferences.theme} ${preferences.compactMode ? 'compact-mode' : ''} mode-${preferences.interfaceMode} ${aiDockOpen ? 'assistant-open' : 'assistant-closed'}`}>
   <header className="app-top-appbar">
@@ -3545,7 +3906,7 @@ ERROR: ${String(error)}
   <div className="app-top-logo"><img className="app-top-logo-image" src="/branding/dss-app-brand-icon.png" alt="Diligent Software Services logo" /></div>
   <div>
   <strong>Diligent Code Studio</strong>
-  <span>Local-first AI development workbench - v0.8.0</span>
+  <span>Local-first AI development workbench - v0.9.0</span>
   </div>
   </div>
 
@@ -3568,7 +3929,7 @@ ERROR: ${String(error)}
   <div>
   <h1>Diligent Code Studio</h1>
   <p className="brand-tagline">Secure software-building workbench</p>
-  <p>Community Edition v0.8.0</p>
+  <p>Community Edition v0.9.0</p>
   </div>
   </div>
 
@@ -3576,7 +3937,6 @@ ERROR: ${String(error)}
   <div className="panel-title"><FolderOpen size={16} /> Workspace</div>
   <input
   value={workspacePath}
-  onChange={(event) => setWorkspacePath(event.target.value)}
   spellCheck={false}
   className="path-input"
   />
@@ -3612,7 +3972,6 @@ ERROR: ${String(error)}
   <Search size={14} />
   <input
   value={filterText}
-  onChange={(event) => setFilterText(event.target.value)}
   placeholder="Filter files..."
   spellCheck={false}
   />
@@ -3628,7 +3987,7 @@ ERROR: ${String(error)}
   const selected = selectedEntry?.path === entry.path;
   return (
   <button
-  key={entry.path}
+
   className={`tree-row ${entry.is_dir ? 'dir' : 'file'} ${selected ? 'selected' : ''}`}
   title={entry.path}
   onClick={() => openEntry(entry)}
@@ -3657,7 +4016,7 @@ ERROR: ${String(error)}
   const dropClass = dragOverMenuPage === page ? `drag-over drag-over-${dragOverMenuDropSide}` : '';
   return (
   <button
-  key={page}
+
   data-workspace-page={page}
   draggable={false}
   className={`${activePage === page ? 'active' : ''} ${draggedMenuPage === page ? 'dragging' : ''} ${dropClass}`}
@@ -3780,12 +4139,18 @@ ERROR: ${String(error)}
   </section>
   )}
 
+  {activePage === 'livepreview' && (
+  <section className="page-content dcs-live-preview-page">
+    <DcsSafeLivePreview />
+  </section>
+)}
+
   {activePage === 'editor' && (
   <section className={`page-content editor-page-content ${openFiles.length === 0 ? 'no-open-tabs' : ''}`}>
   <nav className={`tabs ${openFiles.length === 0 ? 'tabs-empty' : ''}`} aria-label="Open editor tabs">
   {openFiles.map((file) => (
   <button
-  key={file.path}
+
   className={`tab ${file.path === activePath ? 'active' : ''} ${file.dirty ? 'dirty' : ''}`}
   onClick={() => setActivePath(file.path)}
   title={file.path}
@@ -3816,7 +4181,6 @@ ERROR: ${String(error)}
   <input
   type="text"
   value={findQuery}
-  onChange={(event) => setFindQuery(event.target.value)}
   onKeyDown={(event) => {
   if (event.key === 'Enter') {
   event.preventDefault();
@@ -3831,7 +4195,6 @@ ERROR: ${String(error)}
   <input
   type="text"
   value={replaceText}
-  onChange={(event) => setReplaceText(event.target.value)}
   placeholder="Replace with..."
   spellCheck={false}
   />
@@ -3861,7 +4224,6 @@ ERROR: ${String(error)}
   <input
   type="text"
   value={searchQuery}
-  onChange={(event) => setSearchQuery(event.target.value)}
   onKeyDown={(event) => {
   if (event.key === 'Enter') {
   event.preventDefault();
@@ -3874,7 +4236,6 @@ ERROR: ${String(error)}
   <input
   type="text"
   value={searchExtensionFilter}
-  onChange={(event) => setSearchExtensionFilter(event.target.value)}
   placeholder="Extensions: .ps1,.ts,.cs"
   spellCheck={false}
   />
@@ -3917,31 +4278,23 @@ ERROR: ${String(error)}
   <div className={`editor-ai-layout dock-closed ${activeFile ? 'has-active-file' : 'no-active-file'}`}>
   <div className="editor-canvas">
   {activeFile ? (
-  <Editor
-  height="100%"
-  language={activeFile.language}
-  value={activeFile.content}
-  theme={preferences.theme === 'light' ? 'vs' : 'vs-dark'}
-  onChange={updateActiveContent}
-  beforeMount={handleEditorBeforeMount}
-  onMount={handleEditorMount}
-  options={{
-  minimap: { enabled: true },
-  lineNumbers: 'on',
-  glyphMargin: true,
-  renderLineHighlight: 'all',
-  fontSize: preferences.editorFontSize,
-  fontFamily: 'Cascadia Code, Consolas, monospace',
-  wordWrap: preferences.wordWrap ? 'on' : 'off',
-  automaticLayout: true,
-  scrollBeyondLastLine: false,
-  }}
-  />
+  <DcsCodeMirrorEditor
+    fileName={activeFile.name}
+    filePath={activeFile.path}
+    content={activeFile.content}
+    theme={preferences.theme}
+    fontSize={preferences.editorFontSize}
+    wordWrap={preferences.wordWrap}
+    onChange={updateActiveContent}
+    onCursorChange={(lineNumber, column) => setCursorPosition({ lineNumber, column })}
+  
+    jumpLocation={pendingEditorLocation}
+    onJumpComplete={() => setPendingEditorLocation(null)}/>
   ) : (
   <div className="welcome-card editor-welcome-card">
   <ShieldCheck size={48} />
   <h2>Open a file to start editing.</h2>
-  <p>Version 0.7.0-dev starts the First Run Setup Wizard track while keeping the streamlined Workspace Menu from v0.8.0.</p>
+  <p>Version 0.7.0-dev starts the First Run Setup Wizard track while keeping the streamlined Workspace Menu from v0.9.0.</p>
   <div className="recent-files-card">
   <div className="recent-files-header">
   <strong>Recent Files</strong>
@@ -4011,7 +4364,6 @@ ERROR: ${String(error)}
                     <select
                       className="ai-context-dropdown-only"
                       value={aiContextMode}
-                      onChange={(event) => setAiContextMode(event.target.value as AiContextPreference)}
                       aria-label="AI context"
                     >
                       <option value="" disabled>Context</option>
@@ -4027,7 +4379,6 @@ ERROR: ${String(error)}
 <textarea
   className="ai-prompt-box"
   value={aiPrompt}
-  onChange={(event) => setAiPrompt(event.target.value)}
   placeholder="Ask the AI to explain, debug, refactor, document, or improve code..."
   />
   <div className="ai-code-actions">
@@ -4058,7 +4409,7 @@ ERROR: ${String(error)}
   <button onClick={() => prepareProjectAiAction('summarize-project')} disabled={aiBusy}>Summarize Project</button>
   <button onClick={() => prepareProjectAiAction('create-installer-script')} disabled={aiBusy}>Installer Script</button>
   </div>
-  <p className="muted-note">Sensitive files should be excluded with <code>.aiignore</code>. v0.8.0 keeps project-wide prompts, web deployment plans, onboarding guidance, hosting help, movable AI Help, open-source acknowledgment guidance, and streamlined workspace navigation while still asking before sending context when enabled.</p>
+  <p className="muted-note">Sensitive files should be excluded with <code>.aiignore</code>. v0.9.0 keeps project-wide prompts, web deployment plans, onboarding guidance, hosting help, movable AI Help, open-source acknowledgment guidance, and streamlined workspace navigation while still asking before sending context when enabled.</p>
   </section>
 
   <section className="ai-response-card">
@@ -4108,7 +4459,6 @@ ERROR: ${String(error)}
   <input
   type="text"
   value={findQuery}
-  onChange={(event) => setFindQuery(event.target.value)}
   onKeyDown={(event) => {
   if (event.key === 'Enter') {
   event.preventDefault();
@@ -4123,7 +4473,6 @@ ERROR: ${String(error)}
   <input
   type="text"
   value={replaceText}
-  onChange={(event) => setReplaceText(event.target.value)}
   placeholder="Replace with..."
   spellCheck={false}
   />
@@ -4155,7 +4504,6 @@ ERROR: ${String(error)}
   <div className="search-form wide-form">
   <input
   value={searchQuery}
-  onChange={(event) => setSearchQuery(event.target.value)}
   onKeyDown={(event) => {
   if (event.key === 'Enter') {
   event.preventDefault();
@@ -4167,7 +4515,6 @@ ERROR: ${String(error)}
   />
   <input
   value={searchExtensionFilter}
-  onChange={(event) => setSearchExtensionFilter(event.target.value)}
   placeholder="Extensions: .ps1,.ts,.cs"
   spellCheck={false}
   />
@@ -4223,7 +4570,7 @@ ERROR: ${String(error)}
   const reason = commandBlockReason(item.command);
   return (
   <button
-  key={item.command}
+
   className={item.className ?? ''}
   onClick={() => runTerminalCommand(item.command)}
   disabled={terminalRunning || Boolean(reason)}
@@ -4239,7 +4586,6 @@ ERROR: ${String(error)}
   <span>PS</span>
   <input
   value={terminalCommand}
-  onChange={(event) => setTerminalCommand(event.target.value)}
   onKeyDown={(event) => {
   if (event.key === 'Enter') {
   event.preventDefault();
@@ -4329,7 +4675,6 @@ ERROR: ${String(error)}
   <div className="panel-title"><SaveAll size={16} /> Commit</div>
   <textarea
   value={commitMessage}
-  onChange={(event) => setCommitMessage(event.target.value)}
   placeholder="Commit message..."
   spellCheck={true}
   />
@@ -4426,7 +4771,7 @@ ERROR: ${String(error)}
   ) : (
   diagnostics.problems.map((problem, index) => (
   <button
-  key={`${problem.relative_path}-${problem.line_number}-${problem.column}-${index}`}
+
   className={`diagnostic-row ${problem.severity}`}
   onClick={() => openDiagnosticProblem(problem)}
   title={problem.file_path || problem.message}
@@ -4514,8 +4859,7 @@ ERROR: ${String(error)}
   <div className="panel-title"><Edit3 size={16} /> Release Notes</div>
   <textarea
   value={releaseNotes}
-  onChange={(event) => setReleaseNotes(event.target.value)}
-  placeholder="# Diligent Code Studio v0.3.6\n\n## Changes\n- Added platform detection for Windows, Linux, and macOS.\n- Added OS-aware terminal shell handling.\n- Added cross-platform npm and folder-opening support."
+  placeholder="# Diligent Code Studio v0.9.0\n\n## Changes\n- Added platform detection for Windows, Linux, and macOS.\n- Added OS-aware terminal shell handling.\n- Added cross-platform npm and folder-opening support."
   spellCheck={true}
   />
   </section>
@@ -4592,7 +4936,7 @@ ERROR: ${String(error)}
   <div className="template-card-grid">
   {templates.map((template) => (
   <button
-  key={template.id}
+
   className={`template-card ${selectedTemplateId === template.id ? 'selected' : ''}`}
   onClick={() => setSelectedTemplateId(template.id)}
   >
@@ -5049,7 +5393,6 @@ ERROR: ${String(error)}
   min={10}
   max={28}
   value={preferences.editorFontSize}
-  onChange={(event) => updatePreference('editorFontSize', clampNumber(event.target.value, 14, 10, 28))}
   />
   </label>
   <label className="setting-check">
@@ -5083,7 +5426,6 @@ ERROR: ${String(error)}
   min={1}
   max={30}
   value={preferences.autoSaveDelaySeconds}
-  onChange={(event) => updatePreference('autoSaveDelaySeconds', clampNumber(event.target.value, 3, 1, 30))}
   />
   </label>
   <p className="muted-note">Auto-save writes the active file after the delay. Manual Save still works normally.</p>
@@ -5095,7 +5437,6 @@ ERROR: ${String(error)}
   <span>Default workspace</span>
   <input
   value={preferences.defaultWorkspacePath}
-  onChange={(event) => updatePreference('defaultWorkspacePath', event.target.value)}
   spellCheck={false}
   />
   </label>
@@ -5120,7 +5461,6 @@ ERROR: ${String(error)}
   <section className="panel settings-panel wide-settings-panel">
   <div className="panel-title"><Bot size={16} /> AI Assistant</div>
   <p className="muted-note">AI is optional. OpenAI sends selected context to the OpenAI API. Ollama uses a local endpoint, usually <code>http://127.0.0.1:11434</code>.</p>
-
 
                   <div className="ai-provider-hub-compact-action ai-provider-hub-top-action dcs-settings-ai-provider-hub-button dcs-settings-ai-provider-hub-top">
                     <button
@@ -5148,7 +5488,6 @@ ERROR: ${String(error)}
   <input
   type="password"
   value={preferences.aiOpenAiApiKey}
-  onChange={(event) => updatePreference('aiOpenAiApiKey', event.target.value)}
   placeholder="sk-..."
   spellCheck={false}
   />
@@ -5174,7 +5513,6 @@ ERROR: ${String(error)}
   <div className="ollama-model-controls">
   <select
   value={preferences.aiOllamaModel}
-  onChange={(event) => updatePreference('aiOllamaModel', event.target.value)}
   disabled={ollamaModelsLoading}
   >
   {ollamaModels.length === 0 ? (
@@ -5192,7 +5530,6 @@ ERROR: ${String(error)}
   <input
   className="manual-model-input"
   value={preferences.aiOllamaModel}
-  onChange={(event) => updatePreference('aiOllamaModel', event.target.value)}
   placeholder="Manual model name, e.g. llama3.2 or codellama"
   spellCheck={false}
   />
@@ -5327,7 +5664,6 @@ ERROR: ${String(error)}
   <input
   className="onboarding-path-input"
   value={preferences.defaultWorkspacePath}
-  onChange={(event) => updatePreference('defaultWorkspacePath', event.target.value)}
   placeholder="C:\DiligentProjects"
   />
               <div className="segmented-mode-row wrap-row">
@@ -5410,7 +5746,6 @@ ERROR: ${String(error)}
   <textarea
   className="editor-ai-prompt assistant-pocket-prompt"
   value={aiHelpPrompt}
-  onChange={(event) => setAiHelpPrompt(event.target.value)}
   placeholder="Ask for help navigating this screen or understanding what to do next..."
   />
 

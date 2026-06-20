@@ -1,4 +1,4 @@
-# Diligent Code Studio v0.8.0 AI Provider Hub Foundation
+# Diligent Code Studio v0.9.0 AI Provider Hub Foundation
 
 The AI Provider Hub is the provider-neutral foundation for connecting Diligent Code Studio to local and online AI services.
 

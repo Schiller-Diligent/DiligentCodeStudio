@@ -1,0 +1,183 @@
+.dcs-forced-live-preview-tab-button {
+  margin-left: 4px;
+}
+
+.dcs-forced-live-preview-tab-button-active {
+  border-color: rgba(96, 165, 250, 0.85) !important;
+  background: #1d4ed8 !important;
+  color: #ffffff !important;
+}
+
+.dcs-forced-live-preview-panel {
+  position: fixed;
+  z-index: 95000;
+  inset: 96px 18px 18px 18px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border: 1px solid rgba(96, 165, 250, 0.42);
+  border-radius: 16px;
+  background: #0f172a;
+  color: #e5e7eb;
+  box-shadow: 0 24px 100px rgba(2, 6, 23, 0.48);
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+.dcs-forced-live-preview-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 12px 14px;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.22);
+  background: rgba(15, 23, 42, 0.98);
+}
+
+.dcs-forced-live-preview-header div {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.dcs-forced-live-preview-header strong {
+  color: #bfdbfe;
+}
+
+.dcs-forced-live-preview-header span,
+.dcs-forced-live-preview-status,
+.dcs-forced-live-preview-footer {
+  color: #94a3b8;
+  font-size: 12px;
+}
+
+.dcs-forced-live-preview-toolbar {
+  display: grid;
+  grid-template-columns: minmax(220px, 1fr) repeat(5, auto);
+  gap: 8px;
+  padding: 10px 12px;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.16);
+}
+
+.dcs-forced-live-preview-toolbar input {
+  min-width: 220px;
+  border: 1px solid rgba(148, 163, 184, 0.34);
+  border-radius: 9px;
+  padding: 8px 10px;
+  background: rgba(15, 23, 42, 0.9);
+  color: #e5e7eb;
+}
+
+.dcs-forced-live-preview-toolbar button,
+.dcs-forced-live-preview-header button {
+  border: 1px solid rgba(148, 163, 184, 0.34);
+  border-radius: 9px;
+  padding: 8px 10px;
+  background: rgba(30, 41, 59, 0.96);
+  color: #e5e7eb;
+  cursor: pointer;
+  font-weight: 650;
+}
+
+.dcs-forced-live-preview-toolbar button:hover,
+.dcs-forced-live-preview-header button:hover {
+  background: rgba(51, 65, 85, 1);
+}
+
+.dcs-forced-live-preview-toolbar button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.dcs-forced-live-preview-toolbar .dcs-forced-live-preview-active {
+  border-color: #60a5fa;
+  background: #1d4ed8;
+}
+
+.dcs-forced-live-preview-status {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-height: 34px;
+  padding: 6px 12px;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.16);
+}
+
+.dcs-forced-live-preview-status strong {
+  color: #93c5fd;
+}
+
+.dcs-forced-live-preview-warning {
+  margin: 8px 12px 0;
+  border: 1px solid rgba(251, 191, 36, 0.42);
+  border-radius: 10px;
+  padding: 8px 10px;
+  background: rgba(120, 53, 15, 0.35);
+  color: #fde68a;
+  font-size: 12px;
+}
+
+.dcs-forced-live-preview-frame {
+  position: relative;
+  flex: 1;
+  min-height: 320px;
+  margin: 10px 12px;
+  overflow: hidden;
+  border: 1px solid rgba(148, 163, 184, 0.3);
+  border-radius: 14px;
+  background: white;
+}
+
+.dcs-forced-live-preview-frame iframe {
+  width: 100%;
+  height: 100%;
+  border: 0;
+  background: white;
+}
+
+.dcs-forced-live-preview-empty {
+  height: 100%;
+  display: grid;
+  place-content: center;
+  text-align: center;
+  color: #334155;
+  padding: 24px;
+}
+
+.dcs-forced-live-preview-empty p {
+  max-width: 560px;
+}
+
+.dcs-forced-live-preview-footer {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 9px 12px;
+  border-top: 1px solid rgba(148, 163, 184, 0.16);
+  background: rgba(15, 23, 42, 0.96);
+}
+
+.dcs-forced-live-preview-footer span,
+.dcs-forced-live-preview-footer small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dcs-forced-live-preview-footer small {
+  color: #fde68a;
+}
+
+@media (max-width: 900px) {
+  .dcs-forced-live-preview-panel {
+    inset: 72px 10px 10px 10px;
+  }
+
+  .dcs-forced-live-preview-toolbar {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .dcs-forced-live-preview-toolbar input {
+    grid-column: 1 / -1;
+  }
+}
