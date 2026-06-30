@@ -1,11 +1,9 @@
-Diligent Code Studio v0.9.0 user manual archive marker.
+# Diligent Code Studio User Manual Archive
 
-This file accompanies the versioned/cumulative user manual archive for release v0.9.0.
+Release: v0.9.0
 
-Primary archive files:
-docs\DiligentCodeStudio_UserManual_Archive_v0.9.0.zip
-docs\DiligentCodeStudio_UserManual_Cumulative_Archive_v0.9.0.zip
+This file is part of the versioned/cumulative user manual archive for Diligent Code Studio v0.9.0.
 
+It exists because scripts/smoke-test.mjs requires a versioned/cumulative manual archive for each release.
 
-Generated:
-2026-06-30 11:53:32
+Generated: 2026-06-30 12:05:50
