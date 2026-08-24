@@ -1,0 +1,239 @@
+name: Cross-Platform Build
+
+on:
+  workflow_dispatch:
+    inputs:
+      release_version:
+        description: Version to validate and label the build artifacts
+        required: true
+        default: '0.9.0'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: dcs-cross-platform-${{ github.ref }}-${{ github.event.inputs.release_version }}
+  cancel-in-progress: false
+
+jobs:
+  quality:
+    name: Quality Gate
+    runs-on: ubuntu-22.04
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: '24'
+          cache: npm
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Setup Rust cache
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri -> target
+
+      - name: Install Linux build dependencies
+        shell: bash
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libwebkit2gtk-4.1-dev \
+            libappindicator3-dev \
+            librsvg2-dev \
+            patchelf \
+            xdg-utils
+
+      - name: Install npm dependencies
+        run: npm ci --no-audit --no-fund
+
+      - name: Validate requested version
+        shell: bash
+        env:
+          RELEASE_VERSION: ${{ github.event.inputs.release_version }}
+        run: |
+          node <<'NODE'
+          const fs = require('fs');
+
+          const requested = process.env.RELEASE_VERSION;
+          const packageVersion = require('./package.json').version;
+          const tauriVersion = require('./src-tauri/tauri.conf.json').version;
+          const cargo = fs.readFileSync('./src-tauri/Cargo.toml', 'utf8');
+          const match = cargo.match(/^\[package\][\s\S]*?^version\s*=\s*"([^"]+)"/m);
+
+          if (!match) {
+            throw new Error('Could not read [package] version from src-tauri/Cargo.toml.');
+          }
+
+          const cargoVersion = match[1];
+          const versions = {
+            requested,
+            packageJson: packageVersion,
+            tauriConfig: tauriVersion,
+            cargoToml: cargoVersion
+          };
+
+          const wrong = Object.entries(versions).filter(([, value]) => value !== requested);
+
+          if (wrong.length) {
+            throw new Error(`Version mismatch: ${JSON.stringify(versions)}`);
+          }
+
+          console.log(`PASS: all release version sources match ${requested}.`);
+          NODE
+
+      - name: Run release quality gate
+        run: npm run release:check
+
+  build:
+    name: ${{ matrix.name }}
+    needs: quality
+    runs-on: ${{ matrix.platform }}
+    timeout-minutes: 45
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: Windows x64
+            platform: windows-latest
+            artifact: DiligentCodeStudio-windows-x64
+            args: ''
+            rust_targets: ''
+
+          - name: Linux x64
+            platform: ubuntu-22.04
+            artifact: DiligentCodeStudio-linux-x64
+            args: ''
+            rust_targets: ''
+
+          - name: Linux ARM64
+            platform: ubuntu-22.04-arm
+            artifact: DiligentCodeStudio-linux-arm64
+            args: ''
+            rust_targets: ''
+
+          - name: macOS Apple Silicon
+            platform: macos-latest
+            artifact: DiligentCodeStudio-macos-arm64
+            args: '--target aarch64-apple-darwin'
+            rust_targets: 'aarch64-apple-darwin'
+
+          - name: macOS Intel
+            platform: macos-latest
+            artifact: DiligentCodeStudio-macos-x64
+            args: '--target x86_64-apple-darwin'
+            rust_targets: 'x86_64-apple-darwin'
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Install Linux build dependencies
+        if: startsWith(matrix.platform, 'ubuntu-')
+        shell: bash
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libwebkit2gtk-4.1-dev \
+            libappindicator3-dev \
+            librsvg2-dev \
+            patchelf \
+            xdg-utils
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: '24'
+          cache: npm
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.rust_targets }}
+
+      - name: Setup Rust cache
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri -> target
+
+      - name: Install npm dependencies
+        run: npm ci --no-audit --no-fund
+
+      - name: Build native Tauri bundles
+        shell: bash
+        env:
+          APPLE_SIGNING_IDENTITY: ${{ startsWith(matrix.platform, 'macos-') && '-' || '' }}
+        run: |
+          if [ -n "${{ matrix.args }}" ]; then
+            npx tauri build ${{ matrix.args }}
+          else
+            npx tauri build
+          fi
+
+      - name: Create SHA-256 manifest
+        shell: bash
+        run: |
+          node <<'NODE'
+          const crypto = require('crypto');
+          const fs = require('fs');
+          const path = require('path');
+
+          const roots = [
+            path.join('src-tauri', 'target', 'release', 'bundle')
+          ];
+
+          const targetRoot = path.join('src-tauri', 'target');
+          if (fs.existsSync(targetRoot)) {
+            for (const entry of fs.readdirSync(targetRoot, { withFileTypes: true })) {
+              if (!entry.isDirectory()) continue;
+              roots.push(path.join(targetRoot, entry.name, 'release', 'bundle'));
+            }
+          }
+
+          const files = [];
+
+          function walk(directory) {
+            if (!fs.existsSync(directory)) return;
+            for (const entry of fs.readdirSync(directory, { withFileTypes: true })) {
+              const full = path.join(directory, entry.name);
+              if (entry.isDirectory()) {
+                walk(full);
+              } else {
+                files.push(full);
+              }
+            }
+          }
+
+          for (const root of roots) walk(root);
+
+          const unique = [...new Set(files)].sort();
+          if (!unique.length) {
+            throw new Error('No Tauri bundle files were produced.');
+          }
+
+          const lines = unique.map(file => {
+            const digest = crypto.createHash('sha256').update(fs.readFileSync(file)).digest('hex');
+            return `${digest}  ${file.replaceAll('\\', '/')}`;
+          });
+
+          fs.writeFileSync('SHA256SUMS.txt', `${lines.join('\n')}\n`);
+          console.log(lines.join('\n'));
+          NODE
+
+      - name: Upload native bundles
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact }}-${{ github.event.inputs.release_version }}
+          if-no-files-found: error
+          retention-days: 14
+          path: |
+            src-tauri/target/release/bundle/**
+            src-tauri/target/*/release/bundle/**
+            SHA256SUMS.txt
