@@ -6,7 +6,7 @@ on:
       release_version:
         description: 'Release version to label the uploaded artifact'
         required: true
-        default: '0.6.10'
+        default: '0.9.0'
 
 permissions:
   contents: read
@@ -45,6 +45,10 @@ jobs:
         with:
           workspaces: src-tauri -> target
 
+      - name: Verify release version consistency
+        shell: pwsh
+        run: ./scripts/Test-ReleaseVersion.ps1 -ReleaseVersion '${{ github.event.inputs.release_version }}'
+
       - name: Install npm dependencies with retry
         shell: pwsh
         run: ./scripts/Install-NpmDependencies.ps1
@@ -61,12 +65,17 @@ jobs:
           $bundleRoot = "src-tauri/target/release/bundle"
           $output = "checksums.txt"
           if (Test-Path $output) { Remove-Item $output -Force }
-          Get-ChildItem $bundleRoot -Recurse -File |
-            Where-Object { $_.Extension -in '.msi', '.exe', '.zip' } |
-            ForEach-Object {
+          $artifacts = @(Get-ChildItem $bundleRoot -Recurse -File |
+            Where-Object { $_.Extension -in '.msi', '.exe', '.zip' })
+          if ($artifacts.Count -eq 0) { throw 'No installer artifacts were produced.' }
+          $wrongVersion = @($artifacts | Where-Object { $_.Name -notlike "*$($env:RELEASE_VERSION)*" })
+          if ($wrongVersion.Count -gt 0) { throw "Installer filename version mismatch: $($wrongVersion.Name -join ', ')" }
+          $artifacts | ForEach-Object {
               $hash = Get-FileHash $_.FullName -Algorithm SHA256
               "$($hash.Hash)  $($_.Name)" | Tee-Object -FilePath $output -Append
             }
+        env:
+          RELEASE_VERSION: ${{ github.event.inputs.release_version }}
 
       - name: Upload Windows release bundle
         uses: actions/upload-artifact@v4

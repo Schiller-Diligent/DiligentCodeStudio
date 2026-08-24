@@ -95,8 +95,7 @@ fn dcs_resolve_source_path(file: &str) -> Result<std::path::PathBuf, String> {
 #[tauri::command]
 fn dcs_read_text_file(file: String) -> Result<(String, String), String> {
     let path = dcs_resolve_source_path(&file)?;
-    let content = std::fs::read_to_string(&path)
-        .map_err(|error| format!("Could not read {}: {error}", path.display()))?;
+    let content = read_text_file_with_recovery(&path)?;
 
     Ok((path.to_string_lossy().to_string(), content))
 }
@@ -104,18 +103,17 @@ fn dcs_read_text_file(file: String) -> Result<(String, String), String> {
 #[tauri::command]
 fn dcs_write_text_file(file: String, content: String) -> Result<(), String> {
     let path = dcs_resolve_source_path(&file)?;
-
-    std::fs::write(&path, content)
-        .map_err(|error| format!("Could not write {}: {error}", path.display()))?;
-
-    Ok(())
+    write_text_file_safely(&path, content)
 }
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
-use std::fs;
-use std::io::Read;
+use std::ffi::OsString;
+use std::fs::{self, OpenOptions};
+use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
 use std::process::Command;
+#[cfg(target_os = "windows")]
+use std::os::windows::ffi::OsStrExt;
 #[cfg(target_os = "windows")]
 use std::os::windows::process::CommandExt;
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -350,7 +348,108 @@ fn io_error(action: &str, path: &Path, error: std::io::Error) -> String {
     format!("Unable to {action} {}: {error}", path.display())
 }
 
-fn write_text_file_safely(path: &Path, contents: String) -> Result<(), String> {
+fn sibling_work_path(path: &Path, suffix: &str) -> Result<PathBuf, String> {
+    let parent = path
+        .parent()
+        .ok_or_else(|| format!("Path does not have a parent directory: {}", path.display()))?;
+    let file_name = path
+        .file_name()
+        .ok_or_else(|| format!("Path does not include a file name: {}", path.display()))?;
+    let mut work_name = OsString::from(".");
+    work_name.push(file_name);
+    work_name.push(suffix);
+    Ok(parent.join(work_name))
+}
+
+fn recovery_path(path: &Path) -> Result<PathBuf, String> {
+    sibling_work_path(path, ".dcs-backup")
+}
+
+fn unique_temp_path(path: &Path) -> Result<PathBuf, String> {
+    let nanos = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map_err(|error| format!("System clock error while saving {}: {error}", path.display()))?
+        .as_nanos();
+    sibling_work_path(
+        path,
+        &format!(".dcs-save-{}-{nanos}.tmp", std::process::id()),
+    )
+}
+
+#[cfg(target_os = "windows")]
+fn wide_null(value: &Path) -> Vec<u16> {
+    value.as_os_str().encode_wide().chain(std::iter::once(0)).collect()
+}
+
+#[cfg(target_os = "windows")]
+fn replace_file_atomically(
+    target: &Path,
+    replacement: &Path,
+    backup: Option<&Path>,
+) -> Result<(), String> {
+    type Bool = i32;
+    type Dword = u32;
+    type Lpvoid = *mut std::ffi::c_void;
+
+    #[link(name = "Kernel32")]
+    extern "system" {
+        fn ReplaceFileW(
+            replaced_file_name: *const u16,
+            replacement_file_name: *const u16,
+            backup_file_name: *const u16,
+            replace_flags: Dword,
+            exclude: Lpvoid,
+            reserved: Lpvoid,
+        ) -> Bool;
+    }
+
+    const REPLACEFILE_WRITE_THROUGH: Dword = 0x0000_0001;
+    let target_wide = wide_null(target);
+    let replacement_wide = wide_null(replacement);
+    let backup_wide = backup.map(wide_null);
+    let backup_pointer = backup_wide
+        .as_ref()
+        .map_or(std::ptr::null(), |value| value.as_ptr());
+    let replaced = unsafe {
+        ReplaceFileW(
+            target_wide.as_ptr(),
+            replacement_wide.as_ptr(),
+            backup_pointer,
+            REPLACEFILE_WRITE_THROUGH,
+            std::ptr::null_mut(),
+            std::ptr::null_mut(),
+        )
+    };
+    if replaced == 0 {
+        return Err(io_error(
+            "atomically replace",
+            target,
+            std::io::Error::last_os_error(),
+        ));
+    }
+    Ok(())
+}
+
+#[cfg(not(target_os = "windows"))]
+fn replace_file_atomically(
+    target: &Path,
+    replacement: &Path,
+    backup: Option<&Path>,
+) -> Result<(), String> {
+    if let Some(backup_path) = backup {
+        fs::copy(target, backup_path)
+            .map_err(|error| io_error("create recovery copy for", target, error))?;
+        let backup_file = fs::File::open(backup_path)
+            .map_err(|error| io_error("open recovery copy", backup_path, error))?;
+        backup_file
+            .sync_all()
+            .map_err(|error| io_error("flush recovery copy", backup_path, error))?;
+    }
+    fs::rename(replacement, target)
+        .map_err(|error| io_error("atomically replace", target, error))
+}
+
+fn write_text_file_atomically(path: &Path, contents: &str, keep_backup: bool) -> Result<(), String> {
     if let Some(parent) = path.parent() {
         if !parent.exists() {
             return Err(format!("Parent directory does not exist: {}", parent.display()));
@@ -360,7 +459,86 @@ fn write_text_file_safely(path: &Path, contents: String) -> Result<(), String> {
         }
     }
 
-    fs::write(path, contents).map_err(|error| io_error("write", path, error))
+    let temp_path = unique_temp_path(path)?;
+    let result = (|| {
+        let mut temp_file = OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .open(&temp_path)
+            .map_err(|error| io_error("create temporary save file", &temp_path, error))?;
+        temp_file
+            .write_all(contents.as_bytes())
+            .map_err(|error| io_error("write temporary save file", &temp_path, error))?;
+        temp_file
+            .flush()
+            .map_err(|error| io_error("flush temporary save file", &temp_path, error))?;
+        temp_file
+            .sync_all()
+            .map_err(|error| io_error("sync temporary save file", &temp_path, error))?;
+        let written_length = temp_file
+            .metadata()
+            .map_err(|error| io_error("validate temporary save file", &temp_path, error))?
+            .len();
+        if written_length != contents.len() as u64 {
+            return Err(format!(
+                "Temporary save validation failed for {}: expected {} bytes but wrote {written_length}",
+                path.display(),
+                contents.len()
+            ));
+        }
+        drop(temp_file);
+
+        if path.exists() {
+            let backup = if keep_backup {
+                Some(recovery_path(path)?)
+            } else {
+                None
+            };
+            if let Some(backup_path) = backup.as_ref() {
+                if backup_path.exists() {
+                    fs::remove_file(backup_path)
+                        .map_err(|error| io_error("replace stale recovery copy", backup_path, error))?;
+                }
+            }
+            replace_file_atomically(path, &temp_path, backup.as_deref())
+        } else {
+            fs::rename(&temp_path, path)
+                .map_err(|error| io_error("finish atomic save for", path, error))
+        }
+    })();
+
+    if result.is_err() && temp_path.exists() {
+        let _ = fs::remove_file(&temp_path);
+    }
+    result
+}
+
+fn write_text_file_safely(path: &Path, contents: String) -> Result<(), String> {
+    write_text_file_atomically(path, &contents, true)
+}
+
+fn read_text_file_with_recovery(path: &Path) -> Result<String, String> {
+    match fs::read_to_string(path) {
+        Ok(contents) => Ok(contents),
+        Err(primary_error) => {
+            let backup = recovery_path(path)?;
+            let recovered = fs::read_to_string(&backup).map_err(|backup_error| {
+                format!(
+                    "Unable to read UTF-8 text file {}: {primary_error}. Recovery copy {} was also unavailable: {backup_error}",
+                    path.display(),
+                    backup.display()
+                )
+            })?;
+            write_text_file_atomically(path, &recovered, false).map_err(|restore_error| {
+                format!(
+                    "Read recovery copy {} but could not restore {}: {restore_error}",
+                    backup.display(),
+                    path.display()
+                )
+            })?;
+            Ok(recovered)
+        }
+    }
 }
 
 fn validate_child_name(name: &str) -> Result<String, String> {
@@ -1241,8 +1419,10 @@ fn list_directory(path: String) -> Result<Vec<WorkspaceEntry>, String> {
 #[tauri::command]
 fn read_text_file(path: String) -> Result<String, String> {
     let file = normalize_path(&path)?;
-    ensure_file(&file)?;
-    fs::read_to_string(&file).map_err(|error| io_error("read UTF-8 text file", &file, error))
+    if !file.exists() && !recovery_path(&file)?.exists() {
+        ensure_file(&file)?;
+    }
+    read_text_file_with_recovery(&file)
 }
 
 #[tauri::command]
@@ -1925,6 +2105,49 @@ fn read_version_from_json(path: &Path) -> Option<String> {
     value.get("version")?.as_str().map(|value| value.to_string())
 }
 
+fn read_version_from_cargo_toml(path: &Path) -> Option<String> {
+    let text = fs::read_to_string(path).ok()?;
+    let mut in_package = false;
+    for line in text.lines() {
+        let trimmed = line.trim();
+        if trimmed.starts_with('[') {
+            in_package = trimmed == "[package]";
+            continue;
+        }
+        if in_package && trimmed.starts_with("version") {
+            let (_, value) = trimmed.split_once('=')?;
+            return Some(value.trim().trim_matches('"').to_string());
+        }
+    }
+    None
+}
+
+fn validated_release_version(workspace: &Path) -> Result<String, String> {
+    let sources = [
+        ("package.json", read_version_from_json(&workspace.join("package.json"))),
+        ("src-tauri/tauri.conf.json", read_version_from_json(&workspace.join("src-tauri").join("tauri.conf.json"))),
+        ("src-tauri/Cargo.toml", read_version_from_cargo_toml(&workspace.join("src-tauri").join("Cargo.toml"))),
+    ];
+    let mut resolved = Vec::new();
+    for (name, version) in sources {
+        let value = version.ok_or_else(|| format!("Release version is missing from {name}."))?;
+        resolved.push((name, value));
+    }
+    let authoritative = resolved[0].1.clone();
+    let mismatches: Vec<String> = resolved.iter()
+        .filter(|(_, version)| version != &authoritative)
+        .map(|(name, version)| format!("{name}={version}"))
+        .collect();
+    if !mismatches.is_empty() {
+        return Err(format!(
+            "Release version mismatch. package.json={} but {}. Align all version sources before packaging.",
+            authoritative,
+            mismatches.join(", ")
+        ));
+    }
+    Ok(authoritative)
+}
+
 fn workspace_version(workspace: &Path) -> String {
     read_version_from_json(&workspace.join("package.json"))
         .or_else(|| read_version_from_json(&workspace.join("src-tauri").join("tauri.conf.json")))
@@ -2058,23 +2281,33 @@ fn create_release_package(workspace_path: String, release_notes: String) -> Resu
     let workspace = normalize_path(&workspace_path)?;
     ensure_directory(&workspace)?;
 
-    let version = workspace_version(&workspace);
+    let version = validated_release_version(&workspace)?;
     let bundle_directory = workspace.join("src-tauri").join("target").join("release").join("bundle");
-    let release_root = workspace.join("releases");
-    fs::create_dir_all(&release_root).map_err(|error| format!("Unable to create releases folder: {error}"))?;
-
-    let release_directory = release_root.join(format!("DiligentCodeStudio_v{}_{}", version, now_unix_seconds()));
-    fs::create_dir_all(&release_directory).map_err(|error| format!("Unable to create release folder: {error}"))?;
-
     let mut artifacts = Vec::new();
     collect_bundle_artifacts(&bundle_directory, &mut artifacts)?;
 
+    if artifacts.is_empty() {
+        return Err("Release package was not created because no installer artifacts were found under src-tauri\\target\\release\\bundle. Run Tauri Build first.".to_string());
+    }
+    let incorrectly_versioned: Vec<String> = artifacts.iter().filter_map(|path| {
+        let name = path.file_name()?.to_string_lossy().to_string();
+        if name.contains(&version) { None } else { Some(name) }
+    }).collect();
+    if !incorrectly_versioned.is_empty() {
+        return Err(format!(
+            "Release package was not created because installer filenames do not contain authoritative version {}: {}",
+            version,
+            incorrectly_versioned.join(", ")
+        ));
+    }
+
+    let release_root = workspace.join("releases");
+    fs::create_dir_all(&release_root).map_err(|error| format!("Unable to create releases folder: {error}"))?;
+    let release_directory = release_root.join(format!("DiligentCodeStudio_v{}_{}", version, now_unix_seconds()));
+    fs::create_dir_all(&release_directory).map_err(|error| format!("Unable to create release folder: {error}"))?;
+
     let mut copied_files = Vec::new();
     let mut messages = Vec::new();
-
-    if artifacts.is_empty() {
-        messages.push("No installer artifacts were found under src-tauri\\target\\release\\bundle. Run Tauri Build first, then create the release package again.".to_string());
-    }
 
     for artifact in artifacts {
         let file_name = artifact
@@ -2111,10 +2344,6 @@ fn create_release_package(workspace_path: String, release_notes: String) -> Resu
         checksum_lines.push(format!("{}  {}", hash, name));
     }
 
-    if checksum_lines.is_empty() {
-        checksum_lines.push("No installer artifacts were available when this checksum file was generated.".to_string());
-    }
-
     fs::write(&checksum_file, format!("{}\n", checksum_lines.join("\n")))
         .map_err(|error| format!("Unable to write checksum file: {error}"))?;
 
@@ -2139,10 +2368,9 @@ fn create_release_package(workspace_path: String, release_notes: String) -> Resu
 
         if !output.status.success() {
             let stderr = String::from_utf8_lossy(&output.stderr).to_string();
-            messages.push(format!("ZIP creation warning: {}", stderr.trim()));
-        } else {
-            messages.push(format!("Created ZIP package: {}", zip_path.display()));
+            return Err(format!("ZIP creation failed: {}", stderr.trim()));
         }
+        messages.push(format!("Created ZIP package: {}", zip_path.display()));
     }
 
     #[cfg(not(target_os = "windows"))]
@@ -2167,10 +2395,14 @@ fn create_release_package(workspace_path: String, release_notes: String) -> Resu
             Ok(value) if value.status.success() => messages.push(format!("Created ZIP package: {}", zip_path.display())),
             Ok(value) => {
                 let stderr = String::from_utf8_lossy(&value.stderr).to_string();
-                messages.push(format!("ZIP creation warning: {}", stderr.trim()));
+                return Err(format!("ZIP creation failed: {}", stderr.trim()));
             }
-            Err(error) => messages.push(format!("ZIP creation skipped because the zip command is unavailable or failed: {error}")),
+            Err(error) => return Err(format!("ZIP creation failed because the zip command is unavailable: {error}")),
         }
+    }
+
+    if !zip_path.is_file() {
+        return Err(format!("ZIP creation reported success but output was not found: {}", zip_path.display()));
     }
 
     messages.push(format!("Release folder: {}", release_directory.display()));
@@ -3186,6 +3418,19 @@ fn run_app() -> Result<(), tauri::Error> {
 mod tests {
     use super::*;
 
+    fn durability_test_directory(name: &str) -> PathBuf {
+        let nanos = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("test clock should follow the Unix epoch")
+            .as_nanos();
+        let directory = std::env::temp_dir().join(format!(
+            "diligent-code-studio-{name}-{}-{nanos}",
+            std::process::id()
+        ));
+        fs::create_dir_all(&directory).expect("test directory should be created");
+        directory
+    }
+
     #[test]
     fn child_name_validation_blocks_path_traversal() {
         assert!(validate_child_name("safe-file.txt").is_ok());
@@ -3217,6 +3462,98 @@ mod tests {
         assert!(normalized.starts_with("npm.cmd "));
         #[cfg(not(target_os = "windows"))]
         assert!(normalized.starts_with("npm "));
+    }
+
+    #[test]
+    fn atomic_text_save_replaces_content_and_keeps_last_known_good_copy() {
+        let directory = durability_test_directory("atomic-save");
+        let file = directory.join("source.txt");
+        fs::write(&file, "previous content").expect("initial source should be written");
+
+        write_text_file_safely(&file, "current content".to_string())
+            .expect("atomic save should succeed");
+
+        assert_eq!(fs::read_to_string(&file).unwrap(), "current content");
+        assert_eq!(
+            fs::read_to_string(recovery_path(&file).unwrap()).unwrap(),
+            "previous content"
+        );
+        assert!(!fs::read_dir(&directory).unwrap().any(|entry| {
+            entry
+                .unwrap()
+                .file_name()
+                .to_string_lossy()
+                .ends_with(".tmp")
+        }));
+        fs::remove_dir_all(directory).expect("test directory should be removed");
+    }
+
+    #[test]
+    fn text_read_restores_valid_recovery_copy_after_primary_corruption() {
+        let directory = durability_test_directory("recovery");
+        let file = directory.join("source.txt");
+        fs::write(&file, [0xff, 0xfe]).expect("corrupt primary should be written");
+        fs::write(recovery_path(&file).unwrap(), "recovered content")
+            .expect("recovery copy should be written");
+
+        let recovered = read_text_file_with_recovery(&file).expect("recovery should succeed");
+
+        assert_eq!(recovered, "recovered content");
+        assert_eq!(fs::read_to_string(&file).unwrap(), "recovered content");
+        fs::remove_dir_all(directory).expect("test directory should be removed");
+    }
+
+    #[test]
+    fn atomic_text_save_handles_large_utf8_content() {
+        let directory = durability_test_directory("large-save");
+        let file = directory.join("large.txt");
+        let contents = "Diligent ☕\n".repeat(350_000);
+
+        write_text_file_safely(&file, contents.clone()).expect("large atomic save should succeed");
+
+        assert_eq!(fs::read_to_string(&file).unwrap(), contents);
+        fs::remove_dir_all(directory).expect("test directory should be removed");
+    }
+
+    #[test]
+    fn atomic_text_save_rejects_missing_parent_without_creating_output() {
+        let directory = durability_test_directory("missing-parent");
+        let file = directory.join("missing").join("source.txt");
+
+        let error = write_text_file_safely(&file, "content".to_string()).unwrap_err();
+
+        assert!(error.contains("Parent directory does not exist"));
+        assert!(!file.exists());
+        fs::remove_dir_all(directory).expect("test directory should be removed");
+    }
+
+    #[test]
+    fn release_version_gate_requires_package_tauri_and_cargo_versions_to_match() {
+        let directory = durability_test_directory("release-version");
+        fs::create_dir_all(directory.join("src-tauri")).unwrap();
+        fs::write(directory.join("package.json"), r#"{"version":"0.9.0"}"#).unwrap();
+        fs::write(directory.join("src-tauri").join("tauri.conf.json"), r#"{"version":"0.9.0"}"#).unwrap();
+        fs::write(directory.join("src-tauri").join("Cargo.toml"), "[package]\nname = \"fixture\"\nversion = \"0.9.0\"\n").unwrap();
+        assert_eq!(validated_release_version(&directory).unwrap(), "0.9.0");
+
+        fs::write(directory.join("src-tauri").join("tauri.conf.json"), r#"{"version":"0.8.0"}"#).unwrap();
+        assert!(validated_release_version(&directory).unwrap_err().contains("version mismatch"));
+        fs::remove_dir_all(directory).unwrap();
+    }
+
+    #[test]
+    fn release_builder_fails_before_creating_output_when_artifacts_are_missing() {
+        let directory = durability_test_directory("release-empty");
+        fs::create_dir_all(directory.join("src-tauri")).unwrap();
+        fs::write(directory.join("package.json"), r#"{"version":"0.9.0"}"#).unwrap();
+        fs::write(directory.join("src-tauri").join("tauri.conf.json"), r#"{"version":"0.9.0"}"#).unwrap();
+        fs::write(directory.join("src-tauri").join("Cargo.toml"), "[package]\nname = \"fixture\"\nversion = \"0.9.0\"\n").unwrap();
+
+        let error = create_release_package(directory.to_string_lossy().to_string(), String::new()).unwrap_err();
+
+        assert!(error.contains("no installer artifacts"));
+        assert!(!directory.join("releases").exists());
+        fs::remove_dir_all(directory).unwrap();
     }
 }
 
