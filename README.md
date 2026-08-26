@@ -1,8 +1,17 @@
-# Diligent Code Studio v0.8.0
+# Diligent Code Studio
+
+**Diligent Software Services**  
+Latest stable release: **v0.9.0**
 
 Diligent Code Studio is a local-first desktop code editor and AI-assisted development workbench built with React, Vite, TypeScript, Tauri, and Rust.
 
-Version **0.7.0-dev** starts the First Run Setup Wizard improvement track. The clean **v0.8.0** release remains the stable baseline; develop this branch until npm, Rust, Tauri, and installer checks pass.
+Diligent Code Studio is part of the Diligent Software Services product suite. Product documentation, installers, application identity, and release metadata should use the official Diligent Software Services branding standard. The compact application identity uses the official circuit-**D** mark; larger documentation and product surfaces use the full Diligent Software Services identity where appropriate.
+
+## Current stable release
+
+Version **0.9.0** is the current stable release. The v0.9.0 release includes validated Windows MSI and NSIS installers and SHA-256 checksums published through GitHub Releases.
+
+Development work on `main` may move beyond the stable release. A newer development commit does not become a stable release until its version metadata, validation gates, native packages, checksums, and GitHub Release are completed together.
 
 ## What is included
 
@@ -11,7 +20,7 @@ Version **0.7.0-dev** starts the First Run Setup Wizard improvement track. The c
 - Current bundled user manual under `public/manuals/`
 - Source documentation under `docs/`
 - Quality, smoke, unit, and security test scripts under `scripts/`
-- GitHub Actions workflow under `.github/workflows/quality-build.yml`
+- GitHub Actions quality and release workflows under `.github/workflows/`
 
 Generated folders such as `dist/`, `node_modules/`, and `src-tauri/target/` are intentionally excluded from the clean source package.
 
@@ -65,17 +74,20 @@ npm run release:check
 
 - Current in-app manual: `public/manuals/DiligentCodeStudio_UserManual.pdf`
 - Source manual copy: `docs/DiligentCodeStudio_UserManual.pdf`
-- Operator/user manual: `docs/manuals/Diligent_Code_Studio_v0.8.0_Operator_User_Manual.pdf`
-- v0.8.0 wizard plan: `FIRST_RUN_SETUP_WIZARD_v0.8.0.md`
 - Security notes: `SECURITY.md`
 - Testing guide: `docs/TESTING_AND_SECURITY.md`
 - Open-source acknowledgments: `docs/OPEN_SOURCE_CREDITS.md`
+- Older release and planning material is retained under the repository documentation/archive structure where applicable.
 
 ## GitHub Actions
 
 - `.github/workflows/quality-build.yml` runs the quality gate on push, pull request, or manual dispatch.
-- `.github/workflows/release-build.yml` can be run manually to build Windows installers, create `checksums.txt`, and upload release artifacts.
+- `.github/workflows/release-build.yml` builds and validates native release artifacts according to the release workflow.
 
-## Release notes
+## Release discipline
 
-The current v0.8.0 notes remain at the repository root. v0.8.0 remains the clean stable baseline, and older release/validation notes are kept under `docs/archive/` when possible.
+A Diligent Code Studio release is considered current only when the source version, Tauri/Cargo/package metadata, build outputs, checksums, and GitHub Release agree. Historical releases remain available for traceability and are not overwritten.
+
+## Diligent Software Services
+
+Official product site: https://diligentsoftwareservices.com/
